@@ -17,7 +17,9 @@ authors = [
 license = { text = "MIT" }
 requires-python = ">=3.10, <3.15"
 
-dependencies = []
+dependencies = [
+    "typing_extensions>=4.4.0",
+]
 
 [project.optional-dependencies]
 full = [
