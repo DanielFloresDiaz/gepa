@@ -204,6 +204,7 @@ class ExperimentTracker:
                         self._mlflow_client.log_param(self._mlflow_run_id, k, v)
                 else:
                     import mlflow  # type: ignore
+
                     mlflow.log_params(str_params)
             except Exception as e:
                 print(f"Warning: Failed to log config to mlflow: {e}")
@@ -241,6 +242,7 @@ class ExperimentTracker:
                             self._mlflow_client.log_metric(self._mlflow_run_id, k, v, step=step or 0)
                     else:
                         import mlflow  # type: ignore
+
                         mlflow.log_metrics(numeric_metrics, step=step)
             except Exception as e:
                 print(f"Warning: Failed to log to mlflow: {e}")
@@ -274,6 +276,7 @@ class ExperimentTracker:
                             self._mlflow_client.log_param(self._mlflow_run_id, f"summary/{k}", v)
                 else:
                     import mlflow  # type: ignore
+
                     if numeric:
                         mlflow.log_metrics(numeric)
                     if text:
@@ -353,6 +356,7 @@ class ExperimentTracker:
                     self._mlflow_client.log_artifact(self._mlflow_run_id, tmp_path, artifact_path=self._p(key))
                 else:
                     import mlflow  # type: ignore
+
                     mlflow.log_artifact(tmp_path, artifact_path=self._p(key))
             except Exception as e:
                 print(f"Warning: Failed to log HTML to mlflow: {e}")

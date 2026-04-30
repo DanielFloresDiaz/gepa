@@ -5,8 +5,9 @@ import math
 import random
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
+from typing import Any
 
-from gepa.core.adapter import Candidate, DataInst, RolloutOutput
+from gepa.core.adapter import CandidateT, DataInst, RolloutOutput
 from gepa.core.callbacks import (
     EvaluationEndEvent,
     EvaluationStartEvent,
@@ -21,11 +22,11 @@ from gepa.proposer.base import CandidateProposal, ProposeNewCandidate
 
 AncestorLog = tuple[int, int, int]
 MergeDescription = tuple[int, int, tuple[int, ...]]
-MergeAttempt = tuple[Candidate, ProgramIdx, ProgramIdx, ProgramIdx] | None
+MergeAttempt = tuple[dict[str, Any], ProgramIdx, ProgramIdx, ProgramIdx] | None
 
 
 def does_triplet_have_desirable_predictors(
-    program_candidates: Sequence[Candidate],
+    program_candidates: Sequence[dict[str, CandidateT]],
     ancestor: ProgramIdx,
     id1: ProgramIdx,
     id2: ProgramIdx,
@@ -49,7 +50,7 @@ def filter_ancestors(
     common_ancestors: Iterable[ProgramIdx],
     merges_performed: tuple[list[AncestorLog], list[MergeDescription]],
     agg_scores: Sequence[float],
-    program_candidates: Sequence[Candidate],
+    program_candidates: Sequence[dict[str, CandidateT]],
 ) -> list[ProgramIdx]:
     filtered_ancestors: list[ProgramIdx] = []
     for ancestor in common_ancestors:
@@ -72,7 +73,7 @@ def find_common_ancestor_pair(
     program_indexes: Sequence[int],
     merges_performed: tuple[list[AncestorLog], list[MergeDescription]],
     agg_scores: Sequence[float],
-    program_candidates: Sequence[Candidate],
+    program_candidates: Sequence[dict[str, CandidateT]],
     max_attempts: int = 10,
 ) -> tuple[int, int, int] | None:
     def get_ancestors(node: int, ancestors_found: set[int]) -> list[int]:
@@ -120,7 +121,7 @@ def sample_and_attempt_merge_programs_by_common_predictors(
     rng: random.Random,
     merge_candidates: Sequence[int],
     merges_performed: tuple[list[AncestorLog], list[MergeDescription]],
-    program_candidates: Sequence[Candidate],
+    program_candidates: Sequence[dict[str, CandidateT]],
     parent_program_for_candidate: Sequence[Sequence[int | None]],
     has_val_support_overlap: Callable[[ProgramIdx, ProgramIdx], bool] | None = None,
     max_attempts: int = 10,
@@ -152,7 +153,7 @@ def sample_and_attempt_merge_programs_by_common_predictors(
 
         # Now we have a common ancestor, which is outperformed by both its descendants
 
-        new_program: Candidate = deepcopy(program_candidates[ancestor])
+        new_program: dict[str, CandidateT] = deepcopy(program_candidates[ancestor])
 
         new_prog_desc: tuple[ProgramIdx, ...] = ()
 
@@ -287,7 +288,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
 
         return selected[:num_subsample_ids]
 
-    def propose(self, state: GEPAState[RolloutOutput, DataId]) -> CandidateProposal[DataId] | None:
+    def propose(self, state: GEPAState[Any, Any, Any]) -> CandidateProposal[DataId] | None:
         i = state.i + 1
         state.full_program_trace[-1]["invoked_merge"] = True
 

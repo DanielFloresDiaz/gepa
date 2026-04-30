@@ -470,15 +470,15 @@ class EngineConfig:
 
     # Strategy selection for the engine
     val_evaluation_policy: EvaluationPolicy | Literal["full_eval"] = "full_eval"
-    candidate_selection_strategy: CandidateSelector | Literal[
-        "pareto", "current_best", "epsilon_greedy", "top_k_pareto"
-    ] = "pareto"
+    candidate_selection_strategy: (
+        CandidateSelector | Literal["pareto", "current_best", "epsilon_greedy", "top_k_pareto"]
+    ) = "pareto"
     frontier_type: FrontierType = "hybrid"
 
     # Acceptance criterion for reflective mutation proposals
-    acceptance_criterion: AcceptanceCriterion | Literal[
-        "strict_improvement", "improvement_or_equal"
-    ] = "strict_improvement"
+    acceptance_criterion: AcceptanceCriterion | Literal["strict_improvement", "improvement_or_equal"] = (
+        "strict_improvement"
+    )
 
     # Parallelization settings for evaluation
     parallel: bool = True
@@ -606,8 +606,8 @@ Based on your analysis, propose an improved version that:
     sections.append("""
 ## Output Format
 
-Provide ONLY the improved version within ``` blocks. The output must be a complete, 
-drop-in replacement for the current component (whether it's a prompt, configuration, 
+Provide ONLY the improved version within ``` blocks. The output must be a complete,
+drop-in replacement for the current component (whether it's a prompt, configuration,
 code, or any other parameter type).
 Do not include explanations, commentary, or markdown outside the ``` blocks.""")
 
@@ -640,9 +640,7 @@ def _build_seed_generation_prompt(
         examples = dataset[:3]
         example_lines = [f"- Example {i}: {ex}" for i, ex in enumerate(examples, 1)]
         sections.append(
-            "\n## Sample Inputs\n\n"
-            "The candidate will be evaluated on inputs like these:\n\n"
-            + "\n".join(example_lines)
+            "\n## Sample Inputs\n\nThe candidate will be evaluated on inputs like these:\n\n" + "\n".join(example_lines)
         )
 
     sections.append(
@@ -1323,9 +1321,9 @@ def optimize_anything(
             "reflection_lm is required when seed_candidate is None. "
             "Set config.reflection.reflection_lm to a model name or callable."
         )
-    if not hasattr(active_adapter, "propose_new_texts"):
+    if not hasattr(active_adapter, "propose_improvements"):
         assert config.reflection.reflection_lm is not None, (
-            f"reflection_lm was not provided. The adapter '{active_adapter!s}' does not provide a propose_new_texts method, "
+            f"reflection_lm was not provided. The adapter '{active_adapter!s}' does not provide a propose_improvements method, "
             + "and hence, GEPA will use the default proposer, which requires a reflection_lm to be specified."
         )
 
@@ -1539,8 +1537,8 @@ def optimize_anything(
 
     # --- 10. Validate reflection prompt template ---
     if config.reflection.reflection_prompt_template is not None:
-        assert not (active_adapter is not None and getattr(active_adapter, "propose_new_texts", None) is not None), (
-            f"Adapter {active_adapter!s} provides its own propose_new_texts method; "
+        assert not (active_adapter is not None and getattr(active_adapter, "propose_improvements", None) is not None), (
+            f"Adapter {active_adapter!s} provides its own propose_improvements method; "
             "reflection_prompt_template will be ignored. Set reflection_prompt_template to None."
         )
 

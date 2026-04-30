@@ -115,7 +115,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
         self.enable_tool_optimization = enable_tool_optimization
         self.reflection_minibatch_size = reflection_minibatch_size
 
-    def propose_new_texts(
+    def propose_improvements(
         self,
         candidate: dict[str, str],
         reflective_dataset: dict[str, list[dict[str, Any]]],
@@ -498,17 +498,17 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
     #     """Extract dspy.Tool objects from traces for tool modules and update candidate["tools"]."""
     #     ...
 
-    # TODO: The current DSPyAdapter implementation uses the GEPA default propose_new_texts.
+    # TODO: The current DSPyAdapter implementation uses the GEPA default propose_improvements.
     # We can potentially override this, to use the instruction proposal similar to MIPROv2.
 
-    # def propose_new_texts(
+    # def propose_improvements(
     #     self,
     #     candidate: Dict[str, str],
     #     reflective_dataset: Dict[str, List[Dict[str, Any]]],
     #     components_to_update: List[str]
     # ) -> Dict[str, str]:
-    #     if self.adapter.propose_new_texts is not None:
-    #         return self.adapter.propose_new_texts(candidate, reflective_dataset, components_to_update)
+    #     if self.adapter.propose_improvements is not None:
+    #         return self.adapter.propose_improvements(candidate, reflective_dataset, components_to_update)
 
     #     from .instruction_proposal import InstructionProposalSignature
     #     new_texts: Dict[str, str] = {}

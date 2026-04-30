@@ -344,7 +344,7 @@ class ConfidenceAdapter(GEPAAdapter[ConfidenceDataInst, ConfidenceTrajectory, Co
         call (e.g. ``temperature``, ``max_tokens``).
     """
 
-    propose_new_texts: ProposalFn | None = None
+    propose_improvements: ProposalFn | None = None
 
     def __init__(
         self,

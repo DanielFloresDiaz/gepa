@@ -164,7 +164,7 @@ def test_dynamic_validation(run_dir, rng):
 
     class DummyAdapter:
         def __init__(self):
-            self.propose_new_texts = self._propose_new_texts
+            self.propose_improvements = self._propose_improvements
 
         def evaluate(self, batch, candidate, capture_traces=False):
             weight = int(candidate["system_prompt"].split("=")[-1])
@@ -177,7 +177,7 @@ def test_dynamic_validation(run_dir, rng):
             records = [{"score": score} for score in eval_batch.scores]
             return dict.fromkeys(components_to_update, records)
 
-        def _propose_new_texts(self, candidate, reflective_dataset, components_to_update):
+        def _propose_improvements(self, candidate, reflective_dataset, components_to_update):
             weight = int(candidate["system_prompt"].split("=")[-1])
             return dict.fromkeys(components_to_update, f"weight={weight + 1}")
 

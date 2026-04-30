@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 class OptimizationStartEvent(TypedDict):
     """Event for on_optimization_start callback."""
 
-    seed_candidate: dict[str, str]
+    seed_candidate: dict[str, Any]
     trainset_size: int
     valset_size: int
     config: dict[str, Any]
@@ -63,14 +63,14 @@ class OptimizationEndEvent(TypedDict):
     best_candidate_idx: int
     total_iterations: int
     total_metric_calls: int
-    final_state: GEPAState
+    final_state: GEPAState[Any, Any, Any]
 
 
 class IterationStartEvent(TypedDict):
     """Event for on_iteration_start callback."""
 
     iteration: int
-    state: GEPAState
+    state: GEPAState[Any, Any, Any]
     trainset_loader: DataLoader
 
 
@@ -78,7 +78,7 @@ class IterationEndEvent(TypedDict):
     """Event for on_iteration_end callback."""
 
     iteration: int
-    state: GEPAState
+    state: GEPAState[Any, Any, Any]
     proposal_accepted: bool
 
 
@@ -87,7 +87,7 @@ class CandidateSelectedEvent(TypedDict):
 
     iteration: int
     candidate_idx: int
-    candidate: dict[str, str]
+    candidate: dict[str, Any]
     score: float
 
 
@@ -148,7 +148,7 @@ class ProposalStartEvent(TypedDict):
     """Event for on_proposal_start callback."""
 
     iteration: int
-    parent_candidate: dict[str, str]
+    parent_candidate: dict[str, Any]
     components: list[str]
     reflective_dataset: dict[str, list[dict[str, Any]]]
 
@@ -157,7 +157,7 @@ class ProposalEndEvent(TypedDict):
     """Event for on_proposal_end callback."""
 
     iteration: int
-    new_instructions: dict[str, str]
+    new_instructions: dict[str, Any]
     prompts: dict[str, str | list[dict[str, Any]]]
     """Per-component prompts sent to the reflection LM (component name → rendered prompt)."""
     raw_lm_outputs: dict[str, str]
@@ -187,7 +187,7 @@ class MergeAttemptedEvent(TypedDict):
 
     iteration: int
     parent_ids: Sequence[ProgramIdx]
-    merged_candidate: dict[str, str]
+    merged_candidate: dict[str, Any]
 
 
 class MergeAcceptedEvent(TypedDict):
@@ -219,7 +219,7 @@ class ValsetEvaluatedEvent(TypedDict):
 
     iteration: int
     candidate_idx: int
-    candidate: dict[str, str]
+    candidate: dict[str, Any]
     scores_by_val_id: dict[Any, float]
     average_score: float
     num_examples_evaluated: int

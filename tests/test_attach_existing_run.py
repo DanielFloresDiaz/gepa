@@ -248,7 +248,7 @@ class TestOptimizeApiAttachExisting:
             return t
 
         class DummyAdapter:
-            propose_new_texts = None
+            propose_improvements = None
 
             def evaluate(self, batch, candidate, capture_traces=False):
                 return EvaluationBatch(outputs=[0.5]*len(batch), scores=[0.5]*len(batch))

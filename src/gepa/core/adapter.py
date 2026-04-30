@@ -5,11 +5,20 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, Protocol, TypeVar
 
-# Generic type aliases matching your original
+from typing_extensions import TypeVar as ExtTypeVar
+
+# Generic type variables
 RolloutOutput = TypeVar("RolloutOutput")
 Trajectory = TypeVar("Trajectory")
 DataInst = TypeVar("DataInst")
-Candidate = dict[str, str]
+
+# CandidateT is the value type for component dictionaries.
+# Candidates are always dict[str, CandidateT]; the default str preserves
+# backward compatibility with dict[str, str] usage.
+CandidateT = ExtTypeVar("CandidateT", default=str)
+
+# Convenience alias for the common dict[str, str] case.
+Candidate = dict[str, CandidateT]
 
 
 @dataclass
@@ -35,28 +44,28 @@ class EvaluationBatch(Generic[Trajectory, RolloutOutput]):
     num_metric_calls: int | None = None
 
 
-class ProposalFn(Protocol):
+class ProposalFn(Protocol[CandidateT]):
     def __call__(
         self,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
         reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
         components_to_update: list[str],
-    ) -> dict[str, str]:
+    ) -> dict[str, CandidateT]:
         """
         - Given the current `candidate`, a reflective dataset (as returned by
           `GEPAAdapter.make_reflective_dataset`), and a list of component names to update,
-          return a mapping component_name -> new component text (str). This allows the user
-          to implement their own instruction proposal logic. For example, the user can use
-          a different LLM, implement DSPy signatures, etc. Another example can be situations
-          where 2 or more components need to be updated together (coupled updates).
+          return a mapping component_name -> new component value for each updated component.
+          This allows the user to implement their own proposal logic. For example, the user
+          can use a different LLM, implement DSPy signatures, etc. Another example can be
+          situations where 2 or more components need to be updated together (coupled updates).
 
         Returns
-        - Dict[str, str] mapping component names to newly proposed component texts.
+        - Dict[str, CandidateT] mapping component names to newly proposed component values.
         """
         ...
 
 
-class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
+class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput, CandidateT]):
     """
     GEPAAdapter is the single integration point between your system
     and the GEPA optimization engine. Implementers provide three responsibilities:
@@ -67,6 +76,8 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
     Trajectory: User-defined type of trajectory data, which typically captures the
         different steps of the program candidate execution.
     RolloutOutput: User-defined type of output data from the program candidate.
+    CandidateT: Value type for component dictionaries (defaults to str). A candidate is
+        always dict[str, CandidateT], mapping component names to their current values.
 
     The following are the responsibilities of the adapter:
     1) Program construction and evaluation (evaluate):
@@ -79,11 +90,11 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
        produce a small JSON-serializable dataset for each component that you want to update. This
        dataset is fed to the teacher LM to propose improved component text.
 
-    3) Optional instruction proposal (propose_new_texts):
+    3) Optional improvement proposal (propose_improvements):
        GEPA provides a default implementation (instruction_proposal.py) that serializes the reflective dataset
-       to propose new component texts. However, users can implement their own proposal logic by implementing this method.
-       This method receives the current candidate, the reflective dataset, and the list of components to update,
-       and returns a mapping from component name to new component text.
+       to propose new component values. However, users can implement their own proposal logic by implementing this
+       method. This method receives the current candidate, the reflective dataset, and the list of components to
+       update, and returns a mapping from component name to new component value.
 
     4) Optional adapter state persistence (get_adapter_state / set_adapter_state):
        Adapters that need to persist state across checkpoint save/load/resume
@@ -100,7 +111,8 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
        engine detects their absence via duck typing and skips the calls.
 
     Key concepts and contracts:
-    - candidate: Dict[str, str] mapping a named component of the system to its corresponding text.
+    - candidate: Dict[str, CandidateT] mapping a named component of the system to its current value.
+      When CandidateT=str (the default) this is a plain dict[str, str].
     - scores: higher is better. GEPA uses:
       - minibatch: sum(scores) to compare old vs. new candidate (acceptance test),
       - full valset: mean(scores) for tracking and Pareto-front selection.
@@ -121,7 +133,7 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
     def evaluate(
         self,
         batch: list[DataInst],
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
         capture_traces: bool = False,
     ) -> EvaluationBatch[Trajectory, RolloutOutput]:
         """
@@ -129,8 +141,8 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
 
         Parameters
         - batch: list of task-specific inputs (DataInst).
-        - candidate: mapping from component name -> component text. You must instantiate
-          your full system with the component text for each component, and execute it on the batch.
+        - candidate: mapping from component name -> component value. You must instantiate
+          your full system with the component value for each component, and execute it on the batch.
         - capture_traces: when True, you must populate `EvaluationBatch.trajectories`
           with a per-example trajectory object that your `make_reflective_dataset` can
           later consume. When False, you may set trajectories=None to save time/memory.
@@ -160,7 +172,7 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
 
     def make_reflective_dataset(
         self,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
         eval_batch: EvaluationBatch[Trajectory, RolloutOutput],
         components_to_update: list[str],
     ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
@@ -192,4 +204,4 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
         """
         ...
 
-    propose_new_texts: ProposalFn | None = None
+    propose_improvements: ProposalFn[CandidateT] | None = None

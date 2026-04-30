@@ -81,7 +81,6 @@ def candidate_tree_dot_from_data(
             tooltip_parts.append(f"--- {comp_name} ---")
             tooltip_parts.append(comp_text)
 
-        tooltip = _escape("\n".join(tooltip_parts))
         label = f"{idx}\\n({score:.2f})"
 
         if idx == best_idx:
@@ -165,7 +164,7 @@ def candidate_tree_html_from_data(
 # ---------------------------------------------------------------------------
 
 
-def candidate_tree_dot(state: GEPAState) -> str:
+def candidate_tree_dot(state: GEPAState[Any, Any, Any]) -> str:
     """Generate a Graphviz DOT string from a :class:`GEPAState`."""
     return candidate_tree_dot_from_data(
         candidates=state.program_candidates,
@@ -175,7 +174,7 @@ def candidate_tree_dot(state: GEPAState) -> str:
     )
 
 
-def candidate_tree_html(state: GEPAState) -> str:
+def candidate_tree_html(state: GEPAState[Any, Any, Any]) -> str:
     """Generate a self-contained HTML page from a :class:`GEPAState`."""
     return candidate_tree_html_from_data(
         candidates=state.program_candidates,
