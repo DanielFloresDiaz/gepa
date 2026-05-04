@@ -41,7 +41,7 @@ from gepa.utils import FileStopper, StopperProtocol
 
 
 def optimize(
-    seed_candidate: dict[str, str],
+    seed_candidate: dict[str, Any],
     trainset: list[DataInst] | DataLoader[DataId, DataInst],
     valset: list[DataInst] | DataLoader[DataId, DataInst] | None = None,
     adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None,
