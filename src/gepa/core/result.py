@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Generic
 
-from gepa.core.adapter import RolloutOutput
+from gepa.core.adapter import CandidateT, RolloutOutput
 from gepa.core.data_loader import DataId
 from gepa.core.state import ProgramIdx
 
@@ -13,12 +13,12 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
-class GEPAResult(Generic[RolloutOutput, DataId]):
+class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
     """Immutable snapshot returned by :func:`~gepa.optimize_anything.optimize_anything`.
 
     Key attributes:
-        best_candidate: The optimized parameter(s) — ``dict[str, str]`` or plain
-            ``str`` when ``seed_candidate`` was a string.
+        best_candidate: The optimized parameter(s) — ``dict[str, CandidateT]`` or plain
+            ``CandidateT`` when ``seed_candidate`` was a CandidateT.
         best_idx: Index of the highest-scoring candidate.
         val_aggregate_scores: Per-candidate average validation score (higher is better).
         candidates: All candidates explored during optimization.
@@ -38,7 +38,7 @@ class GEPAResult(Generic[RolloutOutput, DataId]):
     """
 
     # Core data
-    candidates: list[dict[str, str]]
+    candidates: list[dict[str, CandidateT]]
     parents: list[list[ProgramIdx | None]]
     val_aggregate_scores: list[float]
     val_subscores: list[dict[DataId, float]]
@@ -78,12 +78,12 @@ class GEPAResult(Generic[RolloutOutput, DataId]):
         return max(range(len(scores)), key=lambda i: scores[i])
 
     @property
-    def best_candidate(self) -> str | dict[str, str]:
+    def best_candidate(self) -> CandidateT | dict[str, CandidateT]:
         """Return the best candidate.
 
-        When ``optimize_anything`` was called with a ``str`` seed_candidate,
-        returns the plain ``str`` value.  Otherwise returns the full
-        ``dict[str, str]`` parameter mapping.
+        When ``optimize_anything`` was called with a ``CandidateT`` seed_candidate,
+        returns the plain ``CandidateT`` value.  Otherwise returns the full
+        ``dict[str, CandidateT]`` parameter mapping.
         """
         cand = self.candidates[self.best_idx]
         if self._str_candidate_key is not None and self._str_candidate_key in cand:
@@ -91,7 +91,7 @@ class GEPAResult(Generic[RolloutOutput, DataId]):
         return cand
 
     @property
-    def best_refiner_prompt(self) -> str | None:
+    def best_refiner_prompt(self) -> CandidateT | None:
         """Return the refiner prompt from the best candidate, or ``None`` if
         the refiner was not enabled."""
         return self.candidates[self.best_idx].get("refiner_prompt")
@@ -148,7 +148,7 @@ class GEPAResult(Generic[RolloutOutput, DataId]):
         }
 
     @staticmethod
-    def from_dict(d: dict[str, Any]) -> "GEPAResult[RolloutOutput, DataId]":
+    def from_dict(d: dict[str, Any]) -> "GEPAResult[RolloutOutput, DataId, CandidateT]":
         version = d.get("validation_schema_version") or 0
         if version > GEPAResult._VALIDATION_SCHEMA_VERSION:
             raise ValueError(
@@ -157,9 +157,9 @@ class GEPAResult(Generic[RolloutOutput, DataId]):
             )
 
         if version <= 1:
-            return GEPAResult._migrate_from_dict_v0(d)
+            return GEPAResult[RolloutOutput, DataId, CandidateT]._migrate_from_dict_v0(d)
 
-        return GEPAResult._from_dict_v2(d)
+        return GEPAResult[RolloutOutput, DataId, CandidateT]._from_dict_v2(d)
 
     @staticmethod
     def _common_kwargs_from_dict(d: dict[str, Any]) -> dict[str, Any]:
@@ -176,7 +176,7 @@ class GEPAResult(Generic[RolloutOutput, DataId]):
         }
 
     @staticmethod
-    def _migrate_from_dict_v0(d: dict[str, Any]) -> "GEPAResult[RolloutOutput, DataId]":
+    def _migrate_from_dict_v0(d: dict[str, Any]) -> "GEPAResult[RolloutOutput, DataId, CandidateT]":
         kwargs = GEPAResult._common_kwargs_from_dict(d)
         kwargs["val_subscores"] = [dict(enumerate(scores)) for scores in d.get("val_subscores", [])]
         kwargs["per_val_instance_best_candidates"] = {
@@ -194,7 +194,7 @@ class GEPAResult(Generic[RolloutOutput, DataId]):
         return GEPAResult(**kwargs)
 
     @staticmethod
-    def _from_dict_v2(d: dict[str, Any]) -> "GEPAResult[RolloutOutput, DataId]":
+    def _from_dict_v2(d: dict[str, Any]) -> "GEPAResult[RolloutOutput, DataId, CandidateT]":
         kwargs = GEPAResult._common_kwargs_from_dict(d)
         kwargs["val_subscores"] = [dict(scores) for scores in d.get("val_subscores", [])]
         per_val_instance_best_candidates_data = d.get("per_val_instance_best_candidates", {})
@@ -232,11 +232,11 @@ class GEPAResult(Generic[RolloutOutput, DataId]):
 
     @staticmethod
     def from_state(
-        state: "GEPAState[RolloutOutput, DataId]",
+        state: "GEPAState[RolloutOutput, DataId, CandidateT]",
         run_dir: str | None = None,
         seed: int | None = None,
         str_candidate_key: str | None = None,
-    ) -> "GEPAResult[RolloutOutput, DataId]":
+    ) -> "GEPAResult[RolloutOutput, DataId, CandidateT]":
         """Build a GEPAResult from a GEPAState.
 
         Args:
@@ -250,7 +250,7 @@ class GEPAResult(Generic[RolloutOutput, DataId]):
         }
         objective_front = dict(state.objective_pareto_front)
 
-        return GEPAResult(
+        return GEPAResult[RolloutOutput, DataId, CandidateT](
             candidates=list(state.program_candidates),
             parents=list(state.parent_program_for_candidate),
             val_aggregate_scores=list(state.program_full_scores_val_set),

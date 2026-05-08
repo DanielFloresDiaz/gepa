@@ -17,6 +17,8 @@ import html
 import json
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
+from gepa.core.adapter import CandidateT
+
 if TYPE_CHECKING:
     from gepa.core.state import GEPAState, ProgramIdx
 
@@ -32,7 +34,7 @@ def _escape(text: str) -> str:
 
 
 def candidate_tree_dot_from_data(
-    candidates: Sequence[dict[str, str]],
+    candidates: Sequence[dict[str, CandidateT]],
     parents: Sequence[Sequence[int | None]],
     val_scores: Sequence[float],
     pareto_front_programs: Mapping[Any, set[ProgramIdx]],
@@ -79,7 +81,7 @@ def candidate_tree_dot_from_data(
         tooltip_parts.append("")
         for comp_name, comp_text in sorted(candidate.items()):
             tooltip_parts.append(f"--- {comp_name} ---")
-            tooltip_parts.append(comp_text)
+            tooltip_parts.append(str(comp_text))
 
         label = f"{idx}\\n({score:.2f})"
 
@@ -102,7 +104,7 @@ def candidate_tree_dot_from_data(
 
 
 def candidate_tree_html_from_data(
-    candidates: Sequence[dict[str, str]],
+    candidates: Sequence[dict[str, CandidateT]],
     parents: Sequence[Sequence[int | None]],
     val_scores: Sequence[float],
     pareto_front_programs: Mapping[Any, set[ProgramIdx]],
