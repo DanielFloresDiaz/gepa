@@ -48,7 +48,7 @@ class ProposalFn(Protocol[CandidateT]):
     def __call__(
         self,
         candidate: dict[str, CandidateT],
-        reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
+        reflective_dataset: Any,
         components_to_update: list[str],
     ) -> dict[str, CandidateT]:
         """
