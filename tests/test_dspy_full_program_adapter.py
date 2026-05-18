@@ -137,8 +137,8 @@ class TestReflectionLmProtocol:
         adapter = _make_adapter(reflection_lm=my_lm)
         assert adapter.reflection_lm is my_lm
 
-    def test_propose_new_texts_calls_lm_correctly(self):
-        """propose_new_texts should pass the prompt to reflection_lm and use
+    def test_propose_improvements_calls_lm_correctly(self):
+        """propose_improvements should pass the prompt to reflection_lm and use
         the str return value (not a list)."""
         mock_lm = MagicMock(return_value="<new_program>\nimport dspy\nprogram = dspy.Predict('q -> a')\n</new_program>")
         adapter = _make_adapter(reflection_lm=mock_lm)
@@ -152,7 +152,7 @@ class TestReflectionLmProtocol:
             "gepa.adapters.dspy_full_program_adapter.dspy_program_proposal_signature.DSPyProgramProposalSignature.run",
             return_value={"new_program": "import dspy\nprogram = dspy.Predict('q -> a')"},
         ) as mock_run:
-            result = adapter.propose_new_texts(candidate, reflective_dataset, ["program"])
+            result = adapter.propose_improvements(candidate, reflective_dataset, ["program"])
             mock_run.assert_called_once_with(
                 lm=mock_lm,
                 input_dict={

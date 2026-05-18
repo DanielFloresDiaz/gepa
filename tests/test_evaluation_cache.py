@@ -79,7 +79,7 @@ class TestEvaluationCacheIntegration:
 
         class DummyAdapter:
             def __init__(self):
-                self.propose_new_texts = self._propose_new_texts
+                self.propose_improvements = self._propose_improvements
 
             def evaluate(self, batch, candidate, capture_traces=False):
                 weight = hash(candidate.get("system_prompt", "")) % 10
@@ -91,7 +91,7 @@ class TestEvaluationCacheIntegration:
             def make_reflective_dataset(self, candidate, eval_batch, components_to_update):
                 return dict.fromkeys(components_to_update, [{"score": s} for s in eval_batch.scores])
 
-            def _propose_new_texts(self, candidate, reflective_dataset, components_to_update):
+            def _propose_improvements(self, candidate, reflective_dataset, components_to_update):
                 return dict.fromkeys(components_to_update, f"{candidate.get('system_prompt', '')} v2")
 
         return DummyAdapter()

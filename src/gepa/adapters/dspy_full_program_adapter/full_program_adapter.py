@@ -250,7 +250,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
 
         return ret_d
 
-    def propose_new_texts(
+    def propose_improvements(
         self,
         candidate: dict[str, str],
         reflective_dataset: dict[str, list[dict[str, Any]]],

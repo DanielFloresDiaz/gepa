@@ -4,9 +4,9 @@
 import threading
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
-from gepa.core.adapter import DataInst, GEPAAdapter, ProposalFn, RolloutOutput, Trajectory
+from gepa.core.adapter import CandidateT, DataInst, GEPAAdapter, ProposalFn, RolloutOutput, Trajectory
 from gepa.core.callbacks import (
     CandidateSelectedEvent,
     EvaluationEndEvent,
@@ -41,7 +41,7 @@ class ProposalContext:
 
     iteration: int
     curr_prog_id: int
-    curr_prog: dict[str, str]
+    curr_prog: dict[str, Any]
     curr_prog_score: float
     subsample_ids: list
     minibatch: list
@@ -75,7 +75,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         self,
         logger: Any,
         trainset: list[DataInst] | DataLoader[DataId, DataInst],
-        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
+        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput, Any],
         candidate_selector: CandidateSelector,
         module_selector: ReflectionComponentSelector,
         batch_sampler: BatchSampler[DataId, DataInst],
@@ -117,28 +117,46 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
                 "If you do not have a perfect target score, set skip_perfect_score=False."
             )
 
-    def propose_new_texts(
+    def propose_improvements(
         self,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
         reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
         components_to_update: list[str],
-    ) -> tuple[dict[str, str], dict[str, str | list[dict[str, Any]]], dict[str, str]]:
-        """Propose new instruction texts for the given components.
+    ) -> tuple[dict[str, CandidateT], dict[str, str | list[dict[str, Any]]], dict[str, str]]:
+        """Propose new component values for the given components.
 
         Returns:
-            A tuple of (new_texts, prompts, raw_lm_outputs) where each is a
+            A tuple of (new_values, prompts, raw_lm_outputs) where each is a
             dict keyed by component name.  When the adapter or a custom proposer
             handles the call, prompts and raw_lm_outputs are empty dicts.
         """
         empty: dict[str, str | list[dict[str, Any]]] = {}
-        if self.adapter.propose_new_texts is not None:
-            return self.adapter.propose_new_texts(candidate, reflective_dataset, components_to_update), empty, {}
+        if self.adapter.propose_improvements is not None:
+            return cast(
+                tuple[dict[str, CandidateT], dict[str, str | list[dict[str, Any]]], dict[str, str]],
+                (
+                    self.adapter.propose_improvements(
+                        cast(dict[str, Any], candidate), reflective_dataset, components_to_update
+                    ),
+                    empty,
+                    {},
+                ),
+            )
 
         if self.custom_candidate_proposer is not None:
-            return self.custom_candidate_proposer(candidate, reflective_dataset, components_to_update), empty, {}
+            return cast(
+                tuple[dict[str, CandidateT], dict[str, str | list[dict[str, Any]]], dict[str, str]],
+                (
+                    self.custom_candidate_proposer(
+                        cast(dict[str, Any], candidate), reflective_dataset, components_to_update
+                    ),
+                    empty,
+                    {},
+                ),
+            )
 
         if self.reflection_lm is None:
-            raise ValueError("reflection_lm must be provided when adapter.propose_new_texts is None.")
+            raise ValueError("reflection_lm must be provided when adapter.propose_improvements is None.")
 
         new_texts: dict[str, str] = {}
         prompts: dict[str, str | list[dict[str, Any]]] = {}
@@ -177,9 +195,12 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             new_texts[name] = result["new_instruction"]
             prompts[name] = prompt
             raw_lm_outputs[name] = raw_output
-        return new_texts, prompts, raw_lm_outputs
+        return cast(
+            tuple[dict[str, CandidateT], dict[str, str | list[dict[str, Any]]], dict[str, str]],
+            (new_texts, prompts, raw_lm_outputs),
+        )
 
-    def prepare_proposal(self, state: GEPAState) -> ProposalContext:
+    def prepare_proposal(self, state: GEPAState[Any, Any, Any]) -> ProposalContext:
         """Select parent candidate and sample minibatch. Must be called sequentially.
 
         Performs the state-dependent, non-parallelizable parts of a proposal:
@@ -236,7 +257,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             is_seed_candidate=is_seed_candidate,
         )
 
-    def execute_proposal(self, ctx: ProposalContext, state: GEPAState) -> ProposalOutput:
+    def execute_proposal(self, ctx: ProposalContext, state: GEPAState[Any, Any, Any]) -> ProposalOutput:
         """Run the evaluation + proposal pipeline. Safe for parallel execution.
 
         The only state mutation is the module_selector (e.g. RoundRobin counter),
@@ -338,7 +359,9 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
 
         # 3) Build reflective dataset and propose new content
         try:
-            reflective_dataset = self.adapter.make_reflective_dataset(ctx.curr_prog, eval_curr, predictor_names_to_update)
+            reflective_dataset = self.adapter.make_reflective_dataset(
+                ctx.curr_prog, eval_curr, predictor_names_to_update
+            )
 
             reflective_dataset_concrete: dict[str, list[dict[str, Any]]] = {
                 k: [dict(item) for item in v] for k, v in reflective_dataset.items()
@@ -366,7 +389,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
                 ),
             )
 
-            new_texts, prompts, raw_lm_outputs = self.propose_new_texts(
+            new_texts, prompts, raw_lm_outputs = self.propose_improvements(
                 ctx.curr_prog, reflective_dataset, predictor_names_to_update
             )
 
@@ -420,7 +443,9 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         eval_after = self.adapter.evaluate(ctx.minibatch, new_candidate, capture_traces=True)
         new_scores = eval_after.scores
         new_outputs = eval_after.outputs
-        total_evals += eval_after.num_metric_calls if eval_after.num_metric_calls is not None else len(ctx.subsample_ids)
+        total_evals += (
+            eval_after.num_metric_calls if eval_after.num_metric_calls is not None else len(ctx.subsample_ids)
+        )
 
         notify_callbacks(
             self.callbacks,
@@ -440,9 +465,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
 
         trace_data["new_subsample_scores"] = new_scores
         new_sum = sum(new_scores)
-        self.experiment_tracker.log_metrics(
-            {"new_subsample_score": new_sum, "total_metric_calls": total_evals}, step=i
-        )
+        self.experiment_tracker.log_metrics({"new_subsample_score": new_sum, "total_metric_calls": total_evals}, step=i)
 
         proposal = CandidateProposal(
             candidate=new_candidate,
@@ -465,29 +488,33 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             tag="reflective_mutation",
             metadata=_lm_metadata,
         )
-        return ProposalOutput(proposal=proposal, total_evals=total_evals, trace_data=trace_data, cache_entry=cache_entry)
+        return ProposalOutput(
+            proposal=proposal, total_evals=total_evals, trace_data=trace_data, cache_entry=cache_entry
+        )
 
-    def apply_proposal_output(self, output: ProposalOutput, state: GEPAState) -> None:
+    def apply_proposal_output(self, output: ProposalOutput, state: GEPAState[Any, Any, Any]) -> None:
         """Apply deferred state updates from a proposal. Must be called sequentially."""
         state.increment_evals(output.total_evals)
         if output.cache_entry is not None and state.evaluation_cache is not None:
             candidate, ids, outputs, scores, obj_scores = output.cache_entry
             state.evaluation_cache.put_batch(candidate, ids, outputs, scores, obj_scores)
 
-    def propose_output(self, state: GEPAState) -> ProposalOutput:
+    def propose_output(self, state: GEPAState[Any, Any, Any]) -> ProposalOutput:
         """Run a single reflective mutation iteration, returning a :class:`ProposalOutput`.
 
         The caller is responsible for passing the output to
         :meth:`apply_proposal_output`.
         """
         ctx = self.prepare_proposal(state)
-        state.full_program_trace[-1].update({
-            "selected_program_candidate": ctx.curr_prog_id,
-            "subsample_ids": ctx.subsample_ids,
-        })
+        state.full_program_trace[-1].update(
+            {
+                "selected_program_candidate": ctx.curr_prog_id,
+                "subsample_ids": ctx.subsample_ids,
+            }
+        )
         return self.execute_proposal(ctx, state)
 
-    def propose(self, state: GEPAState) -> CandidateProposal | None:
+    def propose(self, state: GEPAState[Any, Any, Any]) -> CandidateProposal | None:
         """Run a single reflective mutation iteration.
 
         Convenience method equivalent to :meth:`propose_output` followed by

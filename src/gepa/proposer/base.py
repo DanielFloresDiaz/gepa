@@ -4,6 +4,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Generic, Protocol
 
+from gepa.core.adapter import CandidateT
 from gepa.core.data_loader import DataId
 from gepa.core.state import GEPAState
 
@@ -28,8 +29,8 @@ class SubsampleEvaluation:
 
 
 @dataclass
-class CandidateProposal(Generic[DataId]):
-    candidate: dict[str, str]
+class CandidateProposal(Generic[DataId, CandidateT]):
+    candidate: dict[str, CandidateT]
     parent_program_ids: list[int]
     # Optional mini-batch / subsample info
     subsample_indices: list[DataId] | None = None

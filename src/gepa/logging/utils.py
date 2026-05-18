@@ -2,6 +2,8 @@
 # https://github.com/gepa-ai/gepa
 
 
+from typing import Any
+
 from gepa.core.adapter import DataInst
 from gepa.core.data_loader import DataId
 from gepa.core.state import GEPAState, ValsetEvaluation
@@ -10,7 +12,7 @@ from gepa.strategies.eval_policy import EvaluationPolicy
 
 def log_detailed_metrics_after_discovering_new_program(
     logger,
-    gepa_state: GEPAState,
+    gepa_state: GEPAState[Any, Any, Any],
     new_program_idx,
     valset_evaluation: ValsetEvaluation,
     objective_scores,

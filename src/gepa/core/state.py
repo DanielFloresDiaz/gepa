@@ -7,9 +7,9 @@ import os
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Generic, Literal, TypeAlias
+from typing import Any, ClassVar, Generic, Literal, TypeAlias, cast
 
-from gepa.core.adapter import RolloutOutput
+from gepa.core.adapter import CandidateT, RolloutOutput
 from gepa.core.data_loader import DataId
 from gepa.gepa_utils import json_default
 from gepa.logging.logger import LoggerProtocol
@@ -28,9 +28,9 @@ CandidateHash: TypeAlias = str
 CacheKey: TypeAlias = tuple[CandidateHash, DataId]
 
 
-def _candidate_hash(candidate: dict[str, str]) -> CandidateHash:
+def _candidate_hash(candidate: dict[str, Any]) -> CandidateHash:
     """Compute a deterministic hash of a candidate dictionary."""
-    return hashlib.sha256(json.dumps(sorted(candidate.items())).encode()).hexdigest()
+    return hashlib.sha256(json.dumps(sorted(candidate.items()), default=json_default).encode()).hexdigest()
 
 
 @dataclass
@@ -43,18 +43,18 @@ class CachedEvaluation(Generic[RolloutOutput]):
 
 
 @dataclass
-class EvaluationCache(Generic[RolloutOutput, DataId]):
+class EvaluationCache(Generic[RolloutOutput, DataId, CandidateT]):
     """Cache for storing evaluation results of (candidate, example) pairs."""
 
     _cache: dict[CacheKey, CachedEvaluation[RolloutOutput]] = field(default_factory=dict)
 
-    def get(self, candidate: dict[str, str], example_id: DataId) -> CachedEvaluation[RolloutOutput] | None:
+    def get(self, candidate: dict[str, CandidateT], example_id: DataId) -> CachedEvaluation[RolloutOutput] | None:
         """Retrieve cached evaluation result if it exists."""
         return self._cache.get((_candidate_hash(candidate), example_id))
 
     def put(
         self,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
         example_id: DataId,
         output: RolloutOutput,
         score: float,
@@ -64,7 +64,7 @@ class EvaluationCache(Generic[RolloutOutput, DataId]):
         self._cache[(_candidate_hash(candidate), example_id)] = CachedEvaluation(output, score, objective_scores)
 
     def get_batch(
-        self, candidate: dict[str, str], example_ids: list[DataId]
+        self, candidate: dict[str, CandidateT], example_ids: list[DataId]
     ) -> tuple[dict[DataId, CachedEvaluation[RolloutOutput]], list[DataId]]:
         """Look up cached results for a batch. Returns (cached_results, uncached_ids)."""
         h = _candidate_hash(candidate)
@@ -78,7 +78,7 @@ class EvaluationCache(Generic[RolloutOutput, DataId]):
 
     def put_batch(
         self,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
         example_ids: list[DataId],
         outputs: list[RolloutOutput],
         scores: list[float],
@@ -93,10 +93,10 @@ class EvaluationCache(Generic[RolloutOutput, DataId]):
 
     def evaluate_with_cache_full(
         self,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
         example_ids: list[DataId],
         fetcher: Callable[[list[DataId]], Any],
-        evaluator: Callable[[Any, dict[str, str]], tuple[Any, list[float], Sequence[ObjectiveScores] | None]],
+        evaluator: Callable[[Any, dict[str, CandidateT]], tuple[Any, list[float], Sequence[ObjectiveScores] | None]],
     ) -> tuple[dict[DataId, RolloutOutput], dict[DataId, float], dict[DataId, ObjectiveScores] | None, int]:
         """
         Evaluate using cache, returning full results.
@@ -139,7 +139,7 @@ class ValsetEvaluation(Generic[RolloutOutput, DataId]):
     objective_scores_by_val_id: dict[DataId, ObjectiveScores] | None = None
 
 
-class GEPAState(Generic[RolloutOutput, DataId]):
+class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
     """Internal persistent state of a GEPA optimization run.
 
     Tracks all explored candidates, their per-example and per-objective scores,
@@ -154,7 +154,7 @@ class GEPAState(Generic[RolloutOutput, DataId]):
     # Attributes that are runtime-only and should not be serialized (e.g., callback hooks, caches)
     _EXCLUDED_FROM_SERIALIZATION: ClassVar[frozenset[str]] = frozenset({"_budget_hooks"})
 
-    program_candidates: list[dict[str, str]]
+    program_candidates: list[dict[str, CandidateT]]
     parent_program_for_candidate: list[list[ProgramIdx | None]]
     prog_candidate_val_subscores: list[dict[DataId, float]]
     prog_candidate_objective_scores: list[ObjectiveScores]
@@ -182,7 +182,7 @@ class GEPAState(Generic[RolloutOutput, DataId]):
     validation_schema_version: int
 
     # Optional evaluation cache for (candidate, example) pairs
-    evaluation_cache: "EvaluationCache[RolloutOutput, DataId] | None"
+    evaluation_cache: "EvaluationCache[RolloutOutput, DataId, CandidateT] | None"
 
     # Opaque bag for adapter-specific persistent state.
     # Core GEPA never inspects this; adapters read/write via get_adapter_state()/set_adapter_state().
@@ -190,11 +190,11 @@ class GEPAState(Generic[RolloutOutput, DataId]):
 
     def __init__(
         self,
-        seed_candidate: dict[str, str],
+        seed_candidate: dict[str, CandidateT],
         base_evaluation: ValsetEvaluation[RolloutOutput, DataId],
         track_best_outputs: bool = False,
         frontier_type: FrontierType = "instance",
-        evaluation_cache: "EvaluationCache[RolloutOutput, DataId] | None" = None,
+        evaluation_cache: "EvaluationCache[RolloutOutput, DataId, CandidateT] | None" = None,
     ):
         self.program_candidates = [dict(seed_candidate)]
         self.prog_candidate_val_subscores = [dict(base_evaluation.scores_by_val_id)]
@@ -346,7 +346,7 @@ class GEPAState(Generic[RolloutOutput, DataId]):
             self._atomic_write_json(run_dir, "candidates.json", self.program_candidates)
 
     @staticmethod
-    def load(run_dir: str) -> "GEPAState[RolloutOutput, DataId]":
+    def load(run_dir: str) -> "GEPAState[RolloutOutput, DataId, CandidateT]":
         with open(os.path.join(run_dir, "gepa_state.bin"), "rb") as f:
             import pickle
 
@@ -373,7 +373,7 @@ class GEPAState(Generic[RolloutOutput, DataId]):
         assert set(state.pareto_front_valset.keys()) == set(state.program_at_pareto_front_valset.keys())
         assert set(state.objective_pareto_front.keys()) == set(state.program_at_pareto_front_objectives.keys())
         assert isinstance(state.adapter_state, dict)
-        return state
+        return cast("GEPAState[RolloutOutput, DataId, CandidateT]", state)
 
     @staticmethod
     def _migrate_from_legacy_state_v0(d: dict[str, Any]) -> None:
@@ -527,7 +527,7 @@ class GEPAState(Generic[RolloutOutput, DataId]):
     def update_state_with_new_program(
         self,
         parent_program_idx: list[ProgramIdx],
-        new_program: dict[str, str],
+        new_program: dict[str, CandidateT],
         valset_evaluation: ValsetEvaluation,
         run_dir: str | None,
         num_metric_calls_by_discovery_of_new_program: int,
@@ -606,10 +606,10 @@ class GEPAState(Generic[RolloutOutput, DataId]):
 
     def cached_evaluate(
         self,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
         example_ids: list[DataId],
         fetcher: Callable[[list[DataId]], Any],
-        evaluator: Callable[[Any, dict[str, str]], tuple[Any, list[float], Sequence[ObjectiveScores] | None]],
+        evaluator: Callable[[Any, dict[str, CandidateT]], tuple[Any, list[float], Sequence[ObjectiveScores] | None]],
     ) -> tuple[list[float], int]:
         """Evaluate with optional caching. Returns (scores, num_actual_evals)."""
         _, scores_by_id, _, num_actual_evals = self.cached_evaluate_full(candidate, example_ids, fetcher, evaluator)
@@ -617,10 +617,10 @@ class GEPAState(Generic[RolloutOutput, DataId]):
 
     def cached_evaluate_full(
         self,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
         example_ids: list[DataId],
         fetcher: Callable[[list[DataId]], Any],
-        evaluator: Callable[[Any, dict[str, str]], tuple[Any, list[float], Sequence[ObjectiveScores] | None]],
+        evaluator: Callable[[Any, dict[str, CandidateT]], tuple[Any, list[float], Sequence[ObjectiveScores] | None]],
     ) -> tuple[dict[DataId, RolloutOutput], dict[DataId, float], dict[DataId, ObjectiveScores] | None, int]:
         """Evaluate with optional caching, returning full results."""
         if self.evaluation_cache is not None:
@@ -660,15 +660,15 @@ def write_eval_outputs_to_directory(outputs, output_dir: str) -> None:
 def initialize_gepa_state(
     run_dir: str | None,
     logger: LoggerProtocol,
-    seed_candidate: dict[str, str],
     seed_valset_evaluation: ValsetEvaluation[RolloutOutput, DataId],
+    seed_candidate: dict[str, CandidateT],
     track_best_outputs: bool = False,
     frontier_type: FrontierType = "instance",
-    evaluation_cache: "EvaluationCache[RolloutOutput, DataId] | None" = None,
-) -> GEPAState[RolloutOutput, DataId]:
+    evaluation_cache: "EvaluationCache[RolloutOutput, DataId, CandidateT] | None" = None,
+) -> "GEPAState[RolloutOutput, DataId, CandidateT]":
     if run_dir is not None and os.path.exists(os.path.join(run_dir, "gepa_state.bin")):
         logger.log("Loading gepa state from run dir")
-        gepa_state = GEPAState.load(run_dir)
+        gepa_state = cast("GEPAState[RolloutOutput, DataId, CandidateT]", GEPAState.load(run_dir))
         if gepa_state.frontier_type != frontier_type:
             raise ValueError(
                 f"Frontier type mismatch: requested '{frontier_type}' but loaded state has '{gepa_state.frontier_type}'. "

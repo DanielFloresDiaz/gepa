@@ -4,23 +4,23 @@
 from dataclasses import dataclass
 from typing import Any, ClassVar, Mapping, Protocol, runtime_checkable
 
-from gepa.core.adapter import Trajectory
+from gepa.core.adapter import CandidateT, Trajectory
 from gepa.core.state import GEPAState
 
 
 @runtime_checkable
 class CandidateSelector(Protocol):
-    def select_candidate_idx(self, state: GEPAState) -> int: ...
+    def select_candidate_idx(self, state: GEPAState[Any, Any, Any]) -> int: ...
 
 
 class ReflectionComponentSelector(Protocol):
     def __call__(
         self,
-        state: GEPAState,
+        state: GEPAState[Any, Any, Any],
         trajectories: list[Trajectory],
         subsample_scores: list[float],
         candidate_idx: int,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
     ) -> list[str]: ...
 
 

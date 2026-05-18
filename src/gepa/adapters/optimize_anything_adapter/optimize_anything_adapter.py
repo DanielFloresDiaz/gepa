@@ -22,14 +22,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-logger = logging.getLogger(__name__)
-
 from gepa.core.adapter import DataInst, EvaluationBatch, GEPAAdapter
 from gepa.proposer.reflective_mutation.base import LanguageModel
 
 if TYPE_CHECKING:
     from gepa.optimize_anything import Candidate, OptimizationState, RefinerConfig, SideInfo
 
+logger = logging.getLogger(__name__)
 
 REFINER_PROMPT_TEMPLATE = """You are refining a candidate to improve its performance.
 
@@ -539,7 +538,7 @@ class OptimizeAnythingAdapter(GEPAAdapter):
         ret: dict[str, list[dict[str, Any]]] = {}
         for component_name in components_to_update:
             ret[component_name] = []
-            for score, side_info in zip(scores, side_infos, strict=False):
+            for _score, side_info in zip(scores, side_infos, strict=False):
                 ret[component_name].append({})
                 for k, v in side_info.items():
                     if k == "scores":

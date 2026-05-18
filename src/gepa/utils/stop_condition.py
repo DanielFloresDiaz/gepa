@@ -5,7 +5,7 @@ Utility functions for graceful stopping of GEPA runs.
 import os
 import signal
 import time
-from typing import Literal, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from gepa.core.state import GEPAState
 
@@ -18,7 +18,7 @@ class StopperProtocol(Protocol):
     A stopper is a callable object that returns True when the optimization should stop.
     """
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         """
         Check if the optimization should stop.
 
@@ -38,7 +38,7 @@ class TimeoutStopCondition(StopperProtocol):
         self.timeout_seconds = timeout_seconds
         self.start_time = time.time()
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         # return true if timeout has been reached
         return time.time() - self.start_time > self.timeout_seconds
 
@@ -51,7 +51,7 @@ class FileStopper(StopperProtocol):
     def __init__(self, stop_file_path: str):
         self.stop_file_path = stop_file_path
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         # returns true if stop file exists
         return os.path.exists(self.stop_file_path)
 
@@ -69,7 +69,7 @@ class ScoreThresholdStopper(StopperProtocol):
     def __init__(self, threshold: float):
         self.threshold = threshold
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         # return true if score threshold is reached
         try:
             current_best_score = (
@@ -90,7 +90,7 @@ class NoImprovementStopper(StopperProtocol):
         self.best_score = float("-inf")
         self.iterations_without_improvement = 0
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         # return true if max iterations without improvement reached
         try:
             current_score = (
@@ -134,7 +134,7 @@ class SignalStopper(StopperProtocol):
                 # Signal not available on this platform
                 pass
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         # return true if a signal was received
         return self._stop_requested
 
@@ -155,7 +155,7 @@ class MaxTrackedCandidatesStopper(StopperProtocol):
     def __init__(self, max_tracked_candidates: int):
         self.max_tracked_candidates = max_tracked_candidates
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         # return true if max tracked candidates reached
         return len(gepa_state.program_candidates) >= self.max_tracked_candidates
 
@@ -168,7 +168,7 @@ class MaxMetricCallsStopper(StopperProtocol):
     def __init__(self, max_metric_calls: int):
         self.max_metric_calls = max_metric_calls
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         # return true if max metric calls reached
         return gepa_state.total_num_evals >= self.max_metric_calls
 
@@ -185,7 +185,7 @@ class MaxReflectionCostStopper(StopperProtocol):
         self.max_reflection_cost_usd = max_reflection_cost_usd
         self._reflection_lm = reflection_lm
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         cost = getattr(self._reflection_lm, "total_cost", 0.0)
         return cost >= self.max_reflection_cost_usd
 
@@ -203,7 +203,7 @@ class MaxCandidateProposalsStopper(StopperProtocol):
     def __init__(self, max_proposals: int):
         self.max_proposals = max_proposals
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         return gepa_state.i >= self.max_proposals - 1
 
 
@@ -220,7 +220,7 @@ class CompositeStopper(StopperProtocol):
         self.stoppers = stoppers
         self.mode = mode
 
-    def __call__(self, gepa_state: GEPAState) -> bool:
+    def __call__(self, gepa_state: "GEPAState[Any, Any, Any]") -> bool:
         # return true if stopping condition is met
         if self.mode == "any":
             return any(stopper(gepa_state) for stopper in self.stoppers)

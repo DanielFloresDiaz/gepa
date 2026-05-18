@@ -356,9 +356,7 @@ def _execute_in_process(
     else:
         # Capture all variables except Python dunder variables (e.g., __name__, __builtins__)
         # Note: User-defined private variables (single _) are preserved for backwards compatibility
-        variables = {
-            k: v for k, v in context.items() if not k.startswith("__")
-        }
+        variables = {k: v for k, v in context.items() if not k.startswith("__")}
 
     # Always include __return__ if it exists
     if "__return__" in context:
@@ -396,6 +394,7 @@ def _execute_subprocess(
         args_path = args_file.name
         if _USE_CLOUDPICKLE:
             import cloudpickle
+
             cloudpickle.dump(
                 {
                     "code": code,  # Pass code through pickle to avoid escaping issues
@@ -534,6 +533,7 @@ with open({results_path!r}, 'wb') as f:
                 try:
                     if _USE_CLOUDPICKLE:
                         import cloudpickle
+
                         with open(results_path, "rb") as f:
                             output = cloudpickle.load(f)
                     else:

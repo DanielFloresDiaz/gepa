@@ -2,7 +2,7 @@
 # https://github.com/gepa-ai/gepa
 
 
-from gepa.core.adapter import Trajectory
+from gepa.core.adapter import CandidateT, Trajectory
 from gepa.core.state import GEPAState
 from gepa.proposer.reflective_mutation.base import ReflectionComponentSelector
 
@@ -14,7 +14,7 @@ class RoundRobinReflectionComponentSelector(ReflectionComponentSelector):
         trajectories: list[Trajectory],
         subsample_scores: list[float],
         candidate_idx: int,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
     ) -> list[str]:
         pid = state.named_predictor_id_to_update_next_for_program_candidate[candidate_idx]
         state.named_predictor_id_to_update_next_for_program_candidate[candidate_idx] = (pid + 1) % len(
@@ -31,6 +31,6 @@ class AllReflectionComponentSelector(ReflectionComponentSelector):
         trajectories: list[Trajectory],
         subsample_scores: list[float],
         candidate_idx: int,
-        candidate: dict[str, str],
+        candidate: dict[str, CandidateT],
     ) -> list[str]:
         return list(candidate.keys())
