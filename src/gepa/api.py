@@ -93,6 +93,8 @@ def optimize(
     val_evaluation_policy: EvaluationPolicy[DataId, DataInst] | Literal["full_eval"] | None = None,
     acceptance_criterion: AcceptanceCriterion
     | Literal["strict_improvement", "improvement_or_equal"] = "strict_improvement",
+    # Parallel proposals
+    num_parallel_proposals: int = 1,
 ) -> GEPAResult[RolloutOutput, DataId]:
     """
     GEPA is an evolutionary optimizer that evolves (multiple) text components of a complex system to optimize them towards a given metric.
@@ -435,6 +437,7 @@ def optimize(
         acceptance_criterion=acceptance_criterion_instance,
         use_cloudpickle=use_cloudpickle,
         evaluation_cache=evaluation_cache,
+        num_parallel_proposals=num_parallel_proposals,
     )
 
     with experiment_tracker:
