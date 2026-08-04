@@ -200,7 +200,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             (new_texts, prompts, raw_lm_outputs),
         )
 
-    def prepare_proposal(self, state: GEPAState[Any, Any]) -> ProposalContext:
+    def prepare_proposal(self, state: GEPAState[Any, Any, Any]) -> ProposalContext:
         """Select parent candidate and sample minibatch. Must be called sequentially.
 
         Performs the state-dependent, non-parallelizable parts of a proposal:
@@ -257,7 +257,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             is_seed_candidate=is_seed_candidate,
         )
 
-    def execute_proposal(self, ctx: ProposalContext, state: GEPAState[Any, Any]) -> ProposalOutput:
+    def execute_proposal(self, ctx: ProposalContext, state: GEPAState[Any, Any, Any]) -> ProposalOutput:
         """Run the evaluation + proposal pipeline. Safe for parallel execution.
 
         The only state mutation is the module_selector (e.g. RoundRobin counter),
@@ -512,14 +512,14 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             proposal=proposal, total_evals=total_evals, trace_data=trace_data, cache_entry=cache_entry
         )
 
-    def apply_proposal_output(self, output: ProposalOutput, state: GEPAState[Any, Any]) -> None:
+    def apply_proposal_output(self, output: ProposalOutput, state: GEPAState[Any, Any, Any]) -> None:
         """Apply deferred state updates from a proposal. Must be called sequentially."""
         state.increment_evals(output.total_evals)
         if output.cache_entry is not None and state.evaluation_cache is not None:
             candidate, ids, outputs, scores, obj_scores = output.cache_entry
             state.evaluation_cache.put_batch(candidate, ids, outputs, scores, obj_scores)
 
-    def propose_output(self, state: GEPAState[Any, Any]) -> ProposalOutput:
+    def propose_output(self, state: GEPAState[Any, Any, Any]) -> ProposalOutput:
         """Run a single reflective mutation iteration, returning a :class:`ProposalOutput`.
 
         The caller is responsible for passing the output to
@@ -534,7 +534,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         )
         return self.execute_proposal(ctx, state)
 
-    def propose(self, state: GEPAState[Any, Any]) -> CandidateProposal | None:
+    def propose(self, state: GEPAState[Any, Any, Any]) -> CandidateProposal | None:
         """Run a single reflective mutation iteration.
 
         Convenience method equivalent to :meth:`propose_output` followed by

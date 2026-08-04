@@ -10,13 +10,13 @@ from gepa.core.state import GEPAState
 
 @runtime_checkable
 class CandidateSelector(Protocol):
-    def select_candidate_idx(self, state: GEPAState[Any, Any]) -> int: ...
+    def select_candidate_idx(self, state: GEPAState[Any, Any, Any]) -> int: ...
 
 
 class ReflectionComponentSelector(Protocol):
     def __call__(
         self,
-        state: GEPAState[Any, Any],
+        state: GEPAState[Any, Any, Any],
         trajectories: list[Trajectory],
         subsample_scores: list[float],
         candidate_idx: int,

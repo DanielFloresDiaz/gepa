@@ -29,7 +29,7 @@ class SubsampleEvaluation:
 
 
 @dataclass
-class CandidateProposal(Generic[DataId]):
+class CandidateProposal(Generic[DataId, CandidateT]):
     candidate: dict[str, CandidateT]
     parent_program_ids: list[int]
     # Optional mini-batch / subsample info
@@ -51,4 +51,4 @@ class ProposeNewCandidate(Protocol[DataId]):
     The engine will handle acceptance and full eval unless the strategy already did those and encoded in metadata.
     """
 
-    def propose(self, state: GEPAState[Any, DataId]) -> CandidateProposal | None: ...
+    def propose(self, state: GEPAState[Any, DataId, Any]) -> CandidateProposal | None: ...
