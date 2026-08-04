@@ -158,7 +158,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         if self.reflection_lm is None:
             raise ValueError("reflection_lm must be provided when adapter.propose_improvements is None.")
 
-        new_texts: dict[str, CandidateT] = {}
+        new_texts: dict[str, str] = {}
         prompts: dict[str, str | list[dict[str, Any]]] = {}
         raw_lm_outputs: dict[str, str] = {}
         for name in components_to_update:
@@ -167,13 +167,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
                 self.logger.log(f"Component '{name}' is not in reflective dataset. Skipping.")
                 continue
 
-            component = candidate[name]
-            base_instruction = component.get("instruction", "")
-            if not isinstance(base_instruction, str):
-                raise TypeError(
-                    f"Default instruction proposal expects candidate[{name!r}]['instruction'] "
-                    f"to be a str, got {type(base_instruction).__name__}."
-                )
+            base_instruction = candidate[name]
             dataset_with_feedback = reflective_dataset[name]
 
             # Determine which prompt template to use for this parameter
@@ -198,9 +192,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
                     "prompt_template": prompt_template,
                 },
             )
-            updated = dict(component)
-            updated["instruction"] = result["new_instruction"]
-            new_texts[name] = cast(CandidateT, updated)
+            new_texts[name] = result["new_instruction"]
             prompts[name] = prompt
             raw_lm_outputs[name] = raw_output
         return cast(

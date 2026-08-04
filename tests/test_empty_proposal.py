@@ -60,7 +60,7 @@ def test_empty_proposal_skips_child_evaluation():
         reflection_lm=None,
     )
 
-    curr_prog = {"comp": {"instruction": "seed"}}
+    curr_prog = {"comp": "seed"}
     ctx = ProposalContext(
         iteration=1,
         curr_prog_id=0,
