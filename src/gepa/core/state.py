@@ -308,7 +308,7 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
             return
         if use_cloudpickle:
             try:
-                import cloudpickle as pickle  # type: ignore[import-not-found]
+                import cloudpickle as pickle
             except ModuleNotFoundError:
                 import pickle
                 import warnings

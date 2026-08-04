@@ -119,6 +119,7 @@ from typing import (
     Protocol,
     Sequence,
     TypeAlias,
+    cast,
 )
 
 from gepa.adapters.optimize_anything_adapter.optimize_anything_adapter import OptimizeAnythingAdapter
@@ -1573,9 +1574,9 @@ def optimize_anything(
 
     # Define evaluator function for merge proposer
     def merge_evaluator(
-        inputs: list[DataInst], prog: Candidate
+        inputs: list[DataInst], prog: dict[str, str]
     ) -> tuple[list[object], list[float], list[dict[str, float]] | None]:
-        eval_out = active_adapter.evaluate(inputs, prog, capture_traces=False)
+        eval_out = active_adapter.evaluate(inputs, cast(Candidate, prog), capture_traces=False)
         return eval_out.outputs, eval_out.scores, eval_out.objective_scores
 
     # --- 12. Build merge proposer from MergeConfig (if provided) ---

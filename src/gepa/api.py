@@ -44,7 +44,7 @@ def optimize(
     seed_candidate: dict[str, Any],
     trainset: list[DataInst] | DataLoader[DataId, DataInst],
     valset: list[DataInst] | DataLoader[DataId, DataInst] | None = None,
-    adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput, Any] | None = None,
+    adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None,
     task_lm: str | ChatCompletionCallable | None = None,
     evaluator: Evaluator | None = None,
     # Reflection-based configuration

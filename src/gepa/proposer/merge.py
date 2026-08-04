@@ -207,7 +207,7 @@ def sample_and_attempt_merge_programs_by_common_predictors(
 
     return None
 
-
+# TODO: improve merging logic using for instance another proposer.
 class MergeProposer(ProposeNewCandidate[DataId]):
     """
     Implements merge flow that combines compatible descendants of a common ancestor.

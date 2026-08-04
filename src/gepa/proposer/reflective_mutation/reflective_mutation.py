@@ -75,7 +75,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         self,
         logger: Any,
         trainset: list[DataInst] | DataLoader[DataId, DataInst],
-        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput, Any],
+        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
         candidate_selector: CandidateSelector,
         module_selector: ReflectionComponentSelector,
         batch_sampler: BatchSampler[DataId, DataInst],
@@ -416,6 +416,26 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             import traceback
 
             self.logger.log(traceback.format_exc())
+            return ProposalOutput(
+                proposal=None, total_evals=total_evals, trace_data=trace_data, cache_entry=cache_entry
+            )
+
+        # Skip child eval when the proposer returned no component updates (e.g. no
+        # eligible proposer for the selected components). Avoids wasting budget on
+        # an identical clone and prevents duplicate accepts under stagnation bonuses.
+        if not new_texts:
+            self.logger.log(f"Iteration {i}: Empty proposal (no component updates). Skipping.")
+            notify_callbacks(
+                self.callbacks,
+                "on_evaluation_skipped",
+                EvaluationSkippedEvent(
+                    iteration=i,
+                    candidate_idx=ctx.curr_prog_id,
+                    reason="empty_proposal",
+                    scores=eval_curr.scores,
+                    is_seed_candidate=False,
+                ),
+            )
             return ProposalOutput(
                 proposal=None, total_evals=total_evals, trace_data=trace_data, cache_entry=cache_entry
             )
