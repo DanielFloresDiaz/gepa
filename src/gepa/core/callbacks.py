@@ -63,14 +63,14 @@ class OptimizationEndEvent(TypedDict):
     best_candidate_idx: int
     total_iterations: int
     total_metric_calls: int
-    final_state: GEPAState[Any, Any, Any]
+    final_state: GEPAState[Any, Any]
 
 
 class IterationStartEvent(TypedDict):
     """Event for on_iteration_start callback."""
 
     iteration: int
-    state: GEPAState[Any, Any, Any]
+    state: GEPAState[Any, Any]
     trainset_loader: DataLoader
 
 
@@ -78,7 +78,7 @@ class IterationEndEvent(TypedDict):
     """Event for on_iteration_end callback."""
 
     iteration: int
-    state: GEPAState[Any, Any, Any]
+    state: GEPAState[Any, Any]
     proposal_accepted: bool
 
 

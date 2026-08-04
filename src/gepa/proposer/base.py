@@ -29,7 +29,7 @@ class SubsampleEvaluation:
 
 
 @dataclass
-class CandidateProposal(Generic[DataId, CandidateT]):
+class CandidateProposal(Generic[DataId]):
     candidate: dict[str, CandidateT]
     parent_program_ids: list[int]
     # Optional mini-batch / subsample info

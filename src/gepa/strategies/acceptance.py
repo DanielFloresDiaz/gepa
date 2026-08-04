@@ -26,7 +26,7 @@ class AcceptanceCriterion(Protocol):
       validation scores, the Pareto frontier, iteration count, etc.
     """
 
-    def should_accept(self, proposal: CandidateProposal, state: GEPAState[Any, Any, Any]) -> bool:
+    def should_accept(self, proposal: CandidateProposal, state: GEPAState[Any, Any]) -> bool:
         """Return ``True`` if the proposed candidate should be accepted.
 
         Args:
@@ -42,7 +42,7 @@ class StrictImprovementAcceptance:
     This is the default acceptance criterion used by GEPA.
     """
 
-    def should_accept(self, proposal: CandidateProposal, state: GEPAState[Any, Any, Any]) -> bool:
+    def should_accept(self, proposal: CandidateProposal, state: GEPAState[Any, Any]) -> bool:
         old_sum = sum(proposal.subsample_scores_before or [])
         new_sum = sum(proposal.subsample_scores_after or [])
         return new_sum > old_sum
@@ -55,7 +55,7 @@ class ImprovementOrEqualAcceptance:
     may explore different regions of the solution space.
     """
 
-    def should_accept(self, proposal: CandidateProposal, state: GEPAState[Any, Any, Any]) -> bool:
+    def should_accept(self, proposal: CandidateProposal, state: GEPAState[Any, Any]) -> bool:
         old_sum = sum(proposal.subsample_scores_before or [])
         new_sum = sum(proposal.subsample_scores_after or [])
         return new_sum >= old_sum

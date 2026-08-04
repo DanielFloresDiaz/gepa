@@ -48,12 +48,12 @@ except ImportError:
     tqdm = None
 
 
-class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT]):
+class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput]):
     """Orchestrates the optimization loop using pluggable candidate proposers."""
 
     def __init__(
         self,
-        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput, CandidateT],
+        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
         run_dir: str | None,
         valset: list[DataInst] | DataLoader[DataId, DataInst] | None,
         seed_candidate: dict[str, CandidateT],
@@ -80,7 +80,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         # Acceptance criterion for reflective mutation proposals
         acceptance_criterion: AcceptanceCriterion | None = None,
         # Evaluation caching (stored in state, passed here for initialization)
-        evaluation_cache: EvaluationCache[RolloutOutput, DataId, CandidateT] | None = None,
+        evaluation_cache: EvaluationCache[RolloutOutput, DataId] | None = None,
         # Parallel proposals
         num_parallel_proposals: int = 1,
     ):
@@ -132,7 +132,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             val_evaluation_policy if val_evaluation_policy is not None else FullEvaluationPolicy()
         )
 
-    def _sync_adapter_state_to_state(self, state: GEPAState[Any, Any, Any]) -> None:
+    def _sync_adapter_state_to_state(self, state: GEPAState[Any, Any]) -> None:
         """Snapshot adapter state into GEPAState before saving.
 
         No-op if the adapter does not implement ``get_adapter_state``.
@@ -142,7 +142,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         if getter is not None:
             state.adapter_state = dict(getter())
 
-    def _sync_state_to_adapter(self, state: GEPAState[Any, Any, Any]) -> None:
+    def _sync_state_to_adapter(self, state: GEPAState[Any, Any]) -> None:
         """Restore persisted adapter state into the adapter after loading.
 
         No-op if the adapter does not implement ``set_adapter_state``.
@@ -154,7 +154,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
     def _evaluate_on_valset(
         self,
         program: dict[str, CandidateT],
-        state: GEPAState[RolloutOutput, DataId, CandidateT],
+        state: GEPAState[RolloutOutput, DataId],
     ) -> ValsetEvaluation[RolloutOutput, DataId]:
         valset = self.valset
         assert valset is not None
@@ -175,7 +175,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
     def _run_full_eval_and_add(
         self,
         new_program: dict[str, CandidateT],
-        state: GEPAState[RolloutOutput, DataId, CandidateT],
+        state: GEPAState[RolloutOutput, DataId],
         parent_program_idx: list[int],
     ) -> tuple[int, int]:
         num_metric_calls_by_discovery = state.total_num_evals
@@ -288,7 +288,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         self,
         proposal: CandidateProposal,
         iteration: int,
-        state: GEPAState[RolloutOutput, DataId, CandidateT],
+        state: GEPAState[RolloutOutput, DataId],
     ) -> bool:
         """Check acceptance, run full eval if accepted, fire callbacks.
 
@@ -352,7 +352,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         output: ProposalOutput,
         iteration: int,
         trace_entry: dict,
-        state: GEPAState[RolloutOutput, DataId, CandidateT],
+        state: GEPAState[RolloutOutput, DataId],
     ) -> bool:
         """Apply deferred state updates from a ProposalOutput and run acceptance.
 
@@ -380,7 +380,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
 
     def _run_parallel_reflective_batch(
         self,
-        state: GEPAState[RolloutOutput, DataId, CandidateT],
+        state: GEPAState[RolloutOutput, DataId],
     ) -> bool:
         """Run multiple reflective proposals in parallel.
 
@@ -455,7 +455,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
     # Main optimization loop
     # ------------------------------------------------------------------
 
-    def run(self) -> GEPAState[RolloutOutput, DataId, CandidateT]:
+    def run(self) -> GEPAState[RolloutOutput, DataId]:
         # Check tqdm availability if progress bar is enabled
         progress_bar = None
         if self.display_progress_bar:
@@ -875,7 +875,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             data=rows,
         )
 
-    def _log_candidate_tree(self, state: GEPAState[RolloutOutput, DataId, CandidateT]) -> None:
+    def _log_candidate_tree(self, state: GEPAState[RolloutOutput, DataId]) -> None:
         """Generate and log the candidate tree visualization."""
         try:
             from gepa.visualization import candidate_tree_html
@@ -889,7 +889,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         except Exception as e:
             self.logger.log(f"Warning: Failed to generate candidate tree visualization: {e}")
 
-    def _should_stop(self, state: GEPAState[RolloutOutput, DataId, CandidateT]) -> bool:
+    def _should_stop(self, state: GEPAState[RolloutOutput, DataId]) -> bool:
         """Check if the optimization should stop."""
         if self._stop_requested:
             return True
@@ -897,7 +897,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             return True
         return False
 
-    def _get_remaining_budget(self, state: GEPAState[RolloutOutput, DataId, CandidateT]) -> int | None:
+    def _get_remaining_budget(self, state: GEPAState[RolloutOutput, DataId]) -> int | None:
         """Get remaining metric calls budget, or None if unlimited."""
         stop_cb = self.stop_callback
         if stop_cb is None:

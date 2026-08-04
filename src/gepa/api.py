@@ -14,7 +14,7 @@ from gepa.adapters.default_adapter.default_adapter import (
     DefaultAdapter,
     Evaluator,
 )
-from gepa.core.adapter import DataInst, GEPAAdapter, ProposalFn, RolloutOutput, Trajectory
+from gepa.core.adapter import CandidateT, DataInst, GEPAAdapter, ProposalFn, RolloutOutput, Trajectory
 from gepa.core.data_loader import DataId, DataLoader, ensure_loader
 from gepa.core.engine import GEPAEngine
 from gepa.core.result import GEPAResult
@@ -44,7 +44,7 @@ def optimize(
     seed_candidate: dict[str, Any],
     trainset: list[DataInst] | DataLoader[DataId, DataInst],
     valset: list[DataInst] | DataLoader[DataId, DataInst] | None = None,
-    adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput, Any] | None = None,
+    adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None,
     task_lm: str | ChatCompletionCallable | None = None,
     evaluator: Evaluator | None = None,
     # Reflection-based configuration
@@ -398,7 +398,7 @@ def optimize(
     )
 
     def evaluator_fn(
-        inputs: list[DataInst], prog: dict[str, str]
+        inputs: list[DataInst], prog: dict[str, CandidateT]
     ) -> tuple[list[RolloutOutput], list[float], Sequence[dict[str, float]] | None]:
         eval_out = active_adapter.evaluate(inputs, prog, capture_traces=False)
         return eval_out.outputs, eval_out.scores, eval_out.objective_scores

@@ -166,7 +166,7 @@ def candidate_tree_html_from_data(
 # ---------------------------------------------------------------------------
 
 
-def candidate_tree_dot(state: GEPAState[Any, Any, Any]) -> str:
+def candidate_tree_dot(state: GEPAState[Any, Any]) -> str:
     """Generate a Graphviz DOT string from a :class:`GEPAState`."""
     return candidate_tree_dot_from_data(
         candidates=state.program_candidates,
@@ -176,7 +176,7 @@ def candidate_tree_dot(state: GEPAState[Any, Any, Any]) -> str:
     )
 
 
-def candidate_tree_html(state: GEPAState[Any, Any, Any]) -> str:
+def candidate_tree_html(state: GEPAState[Any, Any]) -> str:
     """Generate a self-contained HTML page from a :class:`GEPAState`."""
     return candidate_tree_html_from_data(
         candidates=state.program_candidates,

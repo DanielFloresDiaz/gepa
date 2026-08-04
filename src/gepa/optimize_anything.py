@@ -119,10 +119,11 @@ from typing import (
     Protocol,
     Sequence,
     TypeAlias,
+    cast,
 )
 
 from gepa.adapters.optimize_anything_adapter.optimize_anything_adapter import OptimizeAnythingAdapter
-from gepa.core.adapter import DataInst, GEPAAdapter, ProposalFn
+from gepa.core.adapter import CandidateT, DataInst, GEPAAdapter, ProposalFn
 from gepa.core.callbacks import GEPACallback
 from gepa.core.data_loader import ensure_loader
 from gepa.core.engine import GEPAEngine
@@ -1573,9 +1574,9 @@ def optimize_anything(
 
     # Define evaluator function for merge proposer
     def merge_evaluator(
-        inputs: list[DataInst], prog: Candidate
+        inputs: list[DataInst], prog: dict[str, CandidateT]
     ) -> tuple[list[object], list[float], list[dict[str, float]] | None]:
-        eval_out = active_adapter.evaluate(inputs, prog, capture_traces=False)
+        eval_out = active_adapter.evaluate(inputs, cast(Candidate, prog), capture_traces=False)
         return eval_out.outputs, eval_out.scores, eval_out.objective_scores
 
     # --- 12. Build merge proposer from MergeConfig (if provided) ---
@@ -1601,7 +1602,7 @@ def optimize_anything(
         adapter=active_adapter,
         run_dir=config.engine.run_dir,
         valset=val_loader,
-        seed_candidate=seed_candidate,
+        seed_candidate=cast(dict[str, CandidateT], seed_candidate),
         perfect_score=config.reflection.perfect_score,
         seed=config.engine.seed,
         reflective_proposer=reflective_proposer,

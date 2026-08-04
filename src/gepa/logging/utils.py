@@ -12,7 +12,7 @@ from gepa.strategies.eval_policy import EvaluationPolicy
 
 def log_detailed_metrics_after_discovering_new_program(
     logger,
-    gepa_state: GEPAState[Any, Any, Any],
+    gepa_state: GEPAState[Any, Any],
     new_program_idx,
     valset_evaluation: ValsetEvaluation,
     objective_scores,

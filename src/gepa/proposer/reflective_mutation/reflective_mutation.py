@@ -75,7 +75,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         self,
         logger: Any,
         trainset: list[DataInst] | DataLoader[DataId, DataInst],
-        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput, Any],
+        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
         candidate_selector: CandidateSelector,
         module_selector: ReflectionComponentSelector,
         batch_sampler: BatchSampler[DataId, DataInst],
@@ -158,7 +158,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         if self.reflection_lm is None:
             raise ValueError("reflection_lm must be provided when adapter.propose_improvements is None.")
 
-        new_texts: dict[str, str] = {}
+        new_texts: dict[str, CandidateT] = {}
         prompts: dict[str, str | list[dict[str, Any]]] = {}
         raw_lm_outputs: dict[str, str] = {}
         for name in components_to_update:
@@ -167,7 +167,13 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
                 self.logger.log(f"Component '{name}' is not in reflective dataset. Skipping.")
                 continue
 
-            base_instruction = candidate[name]
+            component = candidate[name]
+            base_instruction = component.get("instruction", "")
+            if not isinstance(base_instruction, str):
+                raise TypeError(
+                    f"Default instruction proposal expects candidate[{name!r}]['instruction'] "
+                    f"to be a str, got {type(base_instruction).__name__}."
+                )
             dataset_with_feedback = reflective_dataset[name]
 
             # Determine which prompt template to use for this parameter
@@ -192,7 +198,9 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
                     "prompt_template": prompt_template,
                 },
             )
-            new_texts[name] = result["new_instruction"]
+            updated = dict(component)
+            updated["instruction"] = result["new_instruction"]
+            new_texts[name] = cast(CandidateT, updated)
             prompts[name] = prompt
             raw_lm_outputs[name] = raw_output
         return cast(
@@ -200,7 +208,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             (new_texts, prompts, raw_lm_outputs),
         )
 
-    def prepare_proposal(self, state: GEPAState[Any, Any, Any]) -> ProposalContext:
+    def prepare_proposal(self, state: GEPAState[Any, Any]) -> ProposalContext:
         """Select parent candidate and sample minibatch. Must be called sequentially.
 
         Performs the state-dependent, non-parallelizable parts of a proposal:
@@ -257,7 +265,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             is_seed_candidate=is_seed_candidate,
         )
 
-    def execute_proposal(self, ctx: ProposalContext, state: GEPAState[Any, Any, Any]) -> ProposalOutput:
+    def execute_proposal(self, ctx: ProposalContext, state: GEPAState[Any, Any]) -> ProposalOutput:
         """Run the evaluation + proposal pipeline. Safe for parallel execution.
 
         The only state mutation is the module_selector (e.g. RoundRobin counter),
@@ -420,6 +428,26 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
                 proposal=None, total_evals=total_evals, trace_data=trace_data, cache_entry=cache_entry
             )
 
+        # Skip child eval when the proposer returned no component updates (e.g. no
+        # eligible proposer for the selected components). Avoids wasting budget on
+        # an identical clone and prevents duplicate accepts under stagnation bonuses.
+        if not new_texts:
+            self.logger.log(f"Iteration {i}: Empty proposal (no component updates). Skipping.")
+            notify_callbacks(
+                self.callbacks,
+                "on_evaluation_skipped",
+                EvaluationSkippedEvent(
+                    iteration=i,
+                    candidate_idx=ctx.curr_prog_id,
+                    reason="empty_proposal",
+                    scores=eval_curr.scores,
+                    is_seed_candidate=False,
+                ),
+            )
+            return ProposalOutput(
+                proposal=None, total_evals=total_evals, trace_data=trace_data, cache_entry=cache_entry
+            )
+
         # 4) Create candidate, evaluate on same minibatch
         new_candidate = ctx.curr_prog.copy()
         for pname, text in new_texts.items():
@@ -492,14 +520,14 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
             proposal=proposal, total_evals=total_evals, trace_data=trace_data, cache_entry=cache_entry
         )
 
-    def apply_proposal_output(self, output: ProposalOutput, state: GEPAState[Any, Any, Any]) -> None:
+    def apply_proposal_output(self, output: ProposalOutput, state: GEPAState[Any, Any]) -> None:
         """Apply deferred state updates from a proposal. Must be called sequentially."""
         state.increment_evals(output.total_evals)
         if output.cache_entry is not None and state.evaluation_cache is not None:
             candidate, ids, outputs, scores, obj_scores = output.cache_entry
             state.evaluation_cache.put_batch(candidate, ids, outputs, scores, obj_scores)
 
-    def propose_output(self, state: GEPAState[Any, Any, Any]) -> ProposalOutput:
+    def propose_output(self, state: GEPAState[Any, Any]) -> ProposalOutput:
         """Run a single reflective mutation iteration, returning a :class:`ProposalOutput`.
 
         The caller is responsible for passing the output to
@@ -514,7 +542,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
         )
         return self.execute_proposal(ctx, state)
 
-    def propose(self, state: GEPAState[Any, Any, Any]) -> CandidateProposal | None:
+    def propose(self, state: GEPAState[Any, Any]) -> CandidateProposal | None:
         """Run a single reflective mutation iteration.
 
         Convenience method equivalent to :meth:`propose_output` followed by

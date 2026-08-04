@@ -43,7 +43,7 @@ class CachedEvaluation(Generic[RolloutOutput]):
 
 
 @dataclass
-class EvaluationCache(Generic[RolloutOutput, DataId, CandidateT]):
+class EvaluationCache(Generic[RolloutOutput, DataId]):
     """Cache for storing evaluation results of (candidate, example) pairs."""
 
     _cache: dict[CacheKey, CachedEvaluation[RolloutOutput]] = field(default_factory=dict)
@@ -139,7 +139,7 @@ class ValsetEvaluation(Generic[RolloutOutput, DataId]):
     objective_scores_by_val_id: dict[DataId, ObjectiveScores] | None = None
 
 
-class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
+class GEPAState(Generic[RolloutOutput, DataId]):
     """Internal persistent state of a GEPA optimization run.
 
     Tracks all explored candidates, their per-example and per-objective scores,
@@ -182,7 +182,7 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
     validation_schema_version: int
 
     # Optional evaluation cache for (candidate, example) pairs
-    evaluation_cache: "EvaluationCache[RolloutOutput, DataId, CandidateT] | None"
+    evaluation_cache: "EvaluationCache[RolloutOutput, DataId] | None"
 
     # Opaque bag for adapter-specific persistent state.
     # Core GEPA never inspects this; adapters read/write via get_adapter_state()/set_adapter_state().
@@ -194,7 +194,7 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
         base_evaluation: ValsetEvaluation[RolloutOutput, DataId],
         track_best_outputs: bool = False,
         frontier_type: FrontierType = "instance",
-        evaluation_cache: "EvaluationCache[RolloutOutput, DataId, CandidateT] | None" = None,
+        evaluation_cache: "EvaluationCache[RolloutOutput, DataId] | None" = None,
     ):
         self.program_candidates = [dict(seed_candidate)]
         self.prog_candidate_val_subscores = [dict(base_evaluation.scores_by_val_id)]
@@ -308,7 +308,7 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
             return
         if use_cloudpickle:
             try:
-                import cloudpickle as pickle  # type: ignore[import-not-found]
+                import cloudpickle as pickle
             except ModuleNotFoundError:
                 import pickle
                 import warnings
@@ -346,7 +346,7 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
             self._atomic_write_json(run_dir, "candidates.json", self.program_candidates)
 
     @staticmethod
-    def load(run_dir: str) -> "GEPAState[RolloutOutput, DataId, CandidateT]":
+    def load(run_dir: str) -> "GEPAState[RolloutOutput, DataId]":
         with open(os.path.join(run_dir, "gepa_state.bin"), "rb") as f:
             import pickle
 
@@ -373,7 +373,7 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
         assert set(state.pareto_front_valset.keys()) == set(state.program_at_pareto_front_valset.keys())
         assert set(state.objective_pareto_front.keys()) == set(state.program_at_pareto_front_objectives.keys())
         assert isinstance(state.adapter_state, dict)
-        return cast("GEPAState[RolloutOutput, DataId, CandidateT]", state)
+        return cast("GEPAState[RolloutOutput, DataId]", state)
 
     @staticmethod
     def _migrate_from_legacy_state_v0(d: dict[str, Any]) -> None:
@@ -664,11 +664,11 @@ def initialize_gepa_state(
     seed_candidate: dict[str, CandidateT],
     track_best_outputs: bool = False,
     frontier_type: FrontierType = "instance",
-    evaluation_cache: "EvaluationCache[RolloutOutput, DataId, CandidateT] | None" = None,
-) -> "GEPAState[RolloutOutput, DataId, CandidateT]":
+    evaluation_cache: "EvaluationCache[RolloutOutput, DataId] | None" = None,
+) -> "GEPAState[RolloutOutput, DataId]":
     if run_dir is not None and os.path.exists(os.path.join(run_dir, "gepa_state.bin")):
         logger.log("Loading gepa state from run dir")
-        gepa_state = cast("GEPAState[RolloutOutput, DataId, CandidateT]", GEPAState.load(run_dir))
+        gepa_state = cast("GEPAState[RolloutOutput, DataId]", GEPAState.load(run_dir))
         if gepa_state.frontier_type != frontier_type:
             raise ValueError(
                 f"Frontier type mismatch: requested '{frontier_type}' but loaded state has '{gepa_state.frontier_type}'. "

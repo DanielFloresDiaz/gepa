@@ -5,19 +5,13 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, Protocol, TypeVar
 
-from typing_extensions import TypeVar as ExtTypeVar
-
 # Generic type variables
 RolloutOutput = TypeVar("RolloutOutput")
 Trajectory = TypeVar("Trajectory")
 DataInst = TypeVar("DataInst")
 
-# CandidateT is the value type for component dictionaries.
-# Candidates are always dict[str, CandidateT]; the default str preserves
-# backward compatibility with dict[str, str] usage.
-CandidateT = ExtTypeVar("CandidateT", default=str)
-
-# Convenience alias for the common dict[str, str] case.
+# CandidateT is always a field map (e.g. {"instruction": "..."}). Bare strings are not allowed.
+CandidateT = dict[str, Any]
 Candidate = dict[str, CandidateT]
 
 
@@ -44,7 +38,7 @@ class EvaluationBatch(Generic[Trajectory, RolloutOutput]):
     num_metric_calls: int | None = None
 
 
-class ProposalFn(Protocol[CandidateT]):
+class ProposalFn(Protocol):
     def __call__(
         self,
         candidate: dict[str, CandidateT],
@@ -65,7 +59,7 @@ class ProposalFn(Protocol[CandidateT]):
         ...
 
 
-class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput, CandidateT]):
+class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
     """
     GEPAAdapter is the single integration point between your system
     and the GEPA optimization engine. Implementers provide three responsibilities:
@@ -76,8 +70,10 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput, CandidateT]):
     Trajectory: User-defined type of trajectory data, which typically captures the
         different steps of the program candidate execution.
     RolloutOutput: User-defined type of output data from the program candidate.
-    CandidateT: Value type for component dictionaries (defaults to str). A candidate is
-        always dict[str, CandidateT], mapping component names to their current values.
+
+    Candidates are always ``dict[str, CandidateT]`` where ``CandidateT = dict[str, Any]``
+    is a field map (e.g. ``{"instruction": "...", "system_prompt": "..."}``). Bare
+    strings are not allowed as component values.
 
     The following are the responsibilities of the adapter:
     1) Program construction and evaluation (evaluate):
@@ -111,8 +107,8 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput, CandidateT]):
        engine detects their absence via duck typing and skips the calls.
 
     Key concepts and contracts:
-    - candidate: Dict[str, CandidateT] mapping a named component of the system to its current value.
-      When CandidateT=str (the default) this is a plain dict[str, str].
+    - candidate: Dict[str, CandidateT] mapping a named component of the system to its
+      current field map (e.g. {"instruction": "...", "demos": [...]}).
     - scores: higher is better. GEPA uses:
       - minibatch: sum(scores) to compare old vs. new candidate (acceptance test),
       - full valset: mean(scores) for tracking and Pareto-front selection.
@@ -204,4 +200,4 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput, CandidateT]):
         """
         ...
 
-    propose_improvements: ProposalFn[CandidateT] | None = None
+    propose_improvements: ProposalFn | None = None

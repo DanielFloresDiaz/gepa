@@ -1,49 +1,34 @@
 # Copyright (c) 2025 Lakshya A Agrawal and the GEPA contributors
 # https://github.com/gepa-ai/gepa
 
-"""Tests for the user-defined CandidateT type parameter.
+"""Tests for CandidateT as a concrete field-map type alias.
 
 Verifies that GEPAAdapter, ProposalFn, and related types correctly
-support dict[str, CandidateT] where CandidateT is any user-defined type,
-not just str.
+use dict[str, CandidateT] where CandidateT is dict[str, Any]
+(a Mapping field map), not bare strings.
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import Any
 
-from gepa.core.adapter import CandidateT, EvaluationBatch, GEPAAdapter, ProposalFn
+from gepa.core.adapter import EvaluationBatch, ProposalFn
 
 
 # ---------------------------------------------------------------------------
-# User-defined component value type
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class PromptComponent:
-    """Example user-defined type for a candidate component value."""
-
-    text: str
-    temperature: float = 0.7
-    max_tokens: int = 256
-
-
-# ---------------------------------------------------------------------------
-# Concrete adapter typed with PromptComponent
+# Concrete adapter typed with dict field maps
 # ---------------------------------------------------------------------------
 
 
 class TypedAdapter:
-    """Concrete GEPAAdapter[str, str, str, PromptComponent] implementation."""
+    """Concrete GEPAAdapter[str, str, str] implementation with field-map candidates."""
 
     def evaluate(
         self,
         batch: list[str],
-        candidate: dict[str, PromptComponent],
+        candidate: dict[str, dict[str, Any]],
         capture_traces: bool = False,
     ) -> EvaluationBatch[str, str]:
-        has_text = all(component.text for component in candidate.values())
+        has_text = all(component.get("text") for component in candidate.values())
         scores = [1.0 if has_text else 0.0 for _ in batch]
         outputs = [f"output_{i}" for i in range(len(batch))]
         trajectories = [f"trace_{i}" for i in range(len(batch))] if capture_traces else None
@@ -51,7 +36,7 @@ class TypedAdapter:
 
     def make_reflective_dataset(
         self,
-        candidate: dict[str, PromptComponent],
+        candidate: dict[str, dict[str, Any]],
         eval_batch: EvaluationBatch[str, str],
         components_to_update: list[str],
     ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
@@ -62,14 +47,14 @@ class TypedAdapter:
                 continue
             dataset[name] = [
                 {
-                    "Inputs": {"component_text": component.text},
+                    "Inputs": {"component_text": component.get("text", "")},
                     "Generated Outputs": str(eval_batch.outputs),
                     "Feedback": "Example feedback for testing",
                 }
             ]
         return dataset
 
-    propose_improvements: ProposalFn[PromptComponent] | None = None
+    propose_improvements: ProposalFn | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -78,11 +63,11 @@ class TypedAdapter:
 
 
 def test_typed_adapter_evaluate_returns_correct_shape():
-    """evaluate() with dict[str, PromptComponent] candidate returns correct EvaluationBatch."""
+    """evaluate() with dict[str, dict] field-map candidates returns correct EvaluationBatch."""
     adapter = TypedAdapter()
-    candidate: dict[str, PromptComponent] = {
-        "system_prompt": PromptComponent(text="You are a helpful assistant."),
-        "user_template": PromptComponent(text="Answer: {question}", temperature=0.5),
+    candidate: dict[str, dict[str, Any]] = {
+        "system_prompt": {"text": "You are a helpful assistant.", "temperature": 0.7},
+        "user_template": {"text": "Answer: {question}", "temperature": 0.5},
     }
     batch = ["question 1", "question 2", "question 3"]
 
@@ -96,8 +81,8 @@ def test_typed_adapter_evaluate_returns_correct_shape():
 def test_typed_adapter_evaluate_with_traces():
     """evaluate() with capture_traces=True populates trajectories."""
     adapter = TypedAdapter()
-    candidate: dict[str, PromptComponent] = {
-        "prompt": PromptComponent(text="Think step by step."),
+    candidate: dict[str, dict[str, Any]] = {
+        "prompt": {"text": "Think step by step."},
     }
     batch = ["q1", "q2"]
 
@@ -110,8 +95,8 @@ def test_typed_adapter_evaluate_with_traces():
 def test_typed_adapter_make_reflective_dataset():
     """make_reflective_dataset() returns records keyed by component name."""
     adapter = TypedAdapter()
-    candidate: dict[str, PromptComponent] = {
-        "instruction": PromptComponent(text="Be concise."),
+    candidate: dict[str, dict[str, Any]] = {
+        "instruction": {"text": "Be concise."},
     }
     eval_batch = EvaluationBatch(outputs=["out"], scores=[0.5])
 
@@ -125,15 +110,15 @@ def test_typed_adapter_make_reflective_dataset():
 
 
 def test_propose_improvements_attribute_can_be_set():
-    """propose_improvements can be assigned a callable matching ProposalFn[PromptComponent]."""
+    """propose_improvements can be assigned a callable matching ProposalFn."""
 
     def my_proposer(
-        candidate: dict[str, PromptComponent],
+        candidate: dict[str, dict[str, Any]],
         reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
         components_to_update: list[str],
-    ) -> dict[str, PromptComponent]:
+    ) -> dict[str, dict[str, Any]]:
         return {
-            name: PromptComponent(text=f"improved: {candidate[name].text}")
+            name: {**candidate[name], "text": f"improved: {candidate[name]['text']}"}
             for name in components_to_update
             if name in candidate
         }
@@ -141,28 +126,28 @@ def test_propose_improvements_attribute_can_be_set():
     adapter = TypedAdapter()
     adapter.propose_improvements = my_proposer
 
-    candidate: dict[str, PromptComponent] = {"prompt": PromptComponent(text="original")}
+    candidate: dict[str, dict[str, Any]] = {"prompt": {"text": "original"}}
     result = adapter.propose_improvements(candidate, {}, ["prompt"])
 
     assert "prompt" in result
-    assert result["prompt"].text == "improved: original"
+    assert result["prompt"]["text"] == "improved: original"
 
 
-def test_candidateT_default_is_str():
-    """CandidateT defaults to str so dict[str, str] adapters still work without changes."""
+def test_candidateT_is_field_map():
+    """CandidateT is dict[str, Any] field maps, not bare strings."""
 
-    class StrAdapter:
+    class FieldMapAdapter:
         def evaluate(
             self,
             batch: list[str],
-            candidate: dict[str, str],
+            candidate: dict[str, dict[str, Any]],
             capture_traces: bool = False,
         ) -> EvaluationBatch[str, str]:
             return EvaluationBatch(outputs=["out"] * len(batch), scores=[1.0] * len(batch))
 
         def make_reflective_dataset(
             self,
-            candidate: dict[str, str],
+            candidate: dict[str, dict[str, Any]],
             eval_batch: EvaluationBatch[str, str],
             components_to_update: list[str],
         ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
@@ -170,20 +155,20 @@ def test_candidateT_default_is_str():
 
         propose_improvements = None
 
-    adapter = StrAdapter()
-    candidate: dict[str, str] = {"prompt": "You are helpful."}
+    adapter = FieldMapAdapter()
+    candidate: dict[str, dict[str, Any]] = {"prompt": {"instruction": "You are helpful."}}
     result = adapter.evaluate(["q1"], candidate)
     assert result.scores == [1.0]
 
 
 def test_candidate_components_accessible_by_key():
-    """Component values in dict[str, PromptComponent] are accessible by key."""
-    candidate: dict[str, PromptComponent] = {
-        "system": PromptComponent(text="System prompt", temperature=0.3),
-        "user": PromptComponent(text="User prompt", max_tokens=512),
+    """Component field maps in dict[str, CandidateT] are accessible by key."""
+    candidate: dict[str, dict[str, Any]] = {
+        "system": {"text": "System prompt", "temperature": 0.3},
+        "user": {"text": "User prompt", "max_tokens": 512},
     }
-    assert candidate["system"].temperature == 0.3
-    assert candidate["user"].max_tokens == 512
+    assert candidate["system"]["temperature"] == 0.3
+    assert candidate["user"]["max_tokens"] == 512
     assert list(candidate.keys()) == ["system", "user"]
 
 
@@ -195,8 +180,8 @@ def test_adapter_satisfies_gepa_adapter_protocol():
     assert hasattr(adapter, "propose_improvements")
 
 
-def test_str_adapter_satisfies_gepa_adapter_protocol():
-    """A plain dict[str, str] adapter also satisfies the GEPAAdapter interface."""
+def test_field_map_adapter_satisfies_gepa_adapter_protocol():
+    """A plain dict[str, dict] adapter also satisfies the GEPAAdapter interface."""
 
     class MinimalAdapter:
         def evaluate(self, batch, candidate, capture_traces=False):

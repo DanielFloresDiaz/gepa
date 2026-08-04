@@ -207,7 +207,7 @@ def sample_and_attempt_merge_programs_by_common_predictors(
 
     return None
 
-
+# TODO: improve merging logic using for instance another proposer.
 class MergeProposer(ProposeNewCandidate[DataId]):
     """
     Implements merge flow that combines compatible descendants of a common ancestor.
@@ -224,7 +224,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
         logger: LoggerProtocol,
         valset: DataLoader[DataId, DataInst],
         evaluator: Callable[
-            [list[DataInst], dict[str, str]],
+            [list[DataInst], dict[str, CandidateT]],
             tuple[list[RolloutOutput], list[float], Sequence[ObjectiveScores] | None],
         ],
         use_merge: bool,
@@ -288,7 +288,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
 
         return selected[:num_subsample_ids]
 
-    def propose(self, state: GEPAState[Any, Any, Any]) -> CandidateProposal[DataId] | None:
+    def propose(self, state: GEPAState[Any, Any]) -> CandidateProposal[DataId] | None:
         i = state.i + 1
         state.full_program_trace[-1]["invoked_merge"] = True
 
