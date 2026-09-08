@@ -300,13 +300,13 @@ class MergeProposer(ProposeNewCandidate[DataId]):
         pareto_front_programs = state.get_pareto_front_mapping()
 
         tracked_scores: Sequence[float] = getattr(
-            state, "per_program_tracked_scores", state.program_full_scores_val_set
+            state, "per_program_tracked_scores", state.program_full_acceptance_scores_val_set
         )
         merge_candidates = find_dominator_programs(pareto_front_programs, list(tracked_scores))
 
         def has_val_support_overlap(id1: ProgramIdx, id2: ProgramIdx) -> bool:
-            common_ids = set(state.prog_candidate_val_subscores[id1].keys()) & set(
-                state.prog_candidate_val_subscores[id2].keys()
+            common_ids = set(state.prog_candidate_per_example_scores[id1].keys()) & set(
+                state.prog_candidate_per_example_scores[id2].keys()
             )
             return len(common_ids) >= self.val_overlap_floor
 
@@ -331,8 +331,8 @@ class MergeProposer(ProposeNewCandidate[DataId]):
         self.logger.log(f"Iteration {i}: Merged programs {id1} and {id2} via ancestor {ancestor}")
 
         subsample_ids = self.select_eval_subsample_for_merged_program(
-            state.prog_candidate_val_subscores[id1],
-            state.prog_candidate_val_subscores[id2],
+            state.prog_candidate_per_example_scores[id1],
+            state.prog_candidate_per_example_scores[id2],
         )
         if not subsample_ids:
             self.logger.log(
@@ -340,10 +340,11 @@ class MergeProposer(ProposeNewCandidate[DataId]):
             )
             return None
 
-        assert set(subsample_ids).issubset(state.prog_candidate_val_subscores[id1].keys())
-        assert set(subsample_ids).issubset(state.prog_candidate_val_subscores[id2].keys())
-        id1_sub_scores = [state.prog_candidate_val_subscores[id1][k] for k in subsample_ids]
-        id2_sub_scores = [state.prog_candidate_val_subscores[id2][k] for k in subsample_ids]
+        assert set(subsample_ids).issubset(state.prog_candidate_per_example_scores[id1].keys())
+        assert set(subsample_ids).issubset(state.prog_candidate_per_example_scores[id2].keys())
+        id1_sub_scores = [state.prog_candidate_per_example_scores[id1][k] for k in subsample_ids]
+        id2_sub_scores = [state.prog_candidate_per_example_scores[id2][k] for k in subsample_ids]
+        before_scores = [(s1 + s2) / 2 for s1, s2 in zip(id1_sub_scores, id2_sub_scores)]
         state.full_program_trace[-1]["subsample_ids"] = subsample_ids
 
         mini_devset = self.valset.fetch(subsample_ids)
@@ -397,7 +398,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
             candidate=new_program,
             parent_program_ids=[id1, id2],
             subsample_indices=subsample_ids,
-            subsample_scores_before=[sum(id1_sub_scores), sum(id2_sub_scores)],
+            subsample_scores_before=before_scores,
             subsample_scores_after=new_sub_scores,
             tag="merge",
             metadata={"ancestor": ancestor},

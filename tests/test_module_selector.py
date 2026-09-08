@@ -16,8 +16,9 @@ def common_mocks():
     mock_run_return = Mock(
         program_candidates=[{"test": "value"}],
         parent_program_for_candidate=[None],
-        program_full_scores_val_set=[0.5],
-        prog_candidate_val_subscores=[{}],
+        program_full_acceptance_scores_val_set=[0.5],
+        prog_candidate_per_example_scores=[{}],
+        prog_candidate_per_example_acceptance_scores=[{}],
         program_at_pareto_front_valset={0: {}},
         num_metric_calls_by_discovery=[1],
         prog_candidate_objective_scores=[{}],

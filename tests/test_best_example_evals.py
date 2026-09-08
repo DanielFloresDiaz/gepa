@@ -194,7 +194,7 @@ if __name__ == "__main__":
     )
 
     print(f"\nBest candidate: {result.best_candidate}")
-    print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+    print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
     print(f"Total calls: {len(call_log)}")
 
     print("\nCall details:")

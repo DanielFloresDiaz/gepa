@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Protocol, TypedDict, runtime_checkable
+from typing import TYPE_CHECKING, Any, NotRequired, Protocol, TypedDict, runtime_checkable
 
 if TYPE_CHECKING:
     from gepa.core.data_loader import DataLoader
@@ -215,7 +215,14 @@ class ParetoFrontUpdatedEvent(TypedDict):
 
 
 class ValsetEvaluatedEvent(TypedDict):
-    """Event for on_valset_evaluated callback."""
+    """Event for on_valset_evaluated callback.
+
+    ``scores_by_val_id`` are raw per-example metric scores. ``average_score`` is
+    the evaluation policy's valset score (the 1-centered acceptance score under
+    the default ``FullEvaluationPolicy``). ``acceptance_score`` and
+    ``raw_aggregate`` are always the ranking score and the mean of raw
+    per-example metrics, respectively.
+    """
 
     iteration: int
     candidate_idx: int
@@ -227,6 +234,8 @@ class ValsetEvaluatedEvent(TypedDict):
     parent_ids: Sequence[ProgramIdx]
     is_best_program: bool
     outputs_by_val_id: dict[Any, Any] | None
+    acceptance_score: NotRequired[float]
+    raw_aggregate: NotRequired[float]
 
 
 class StateSavedEvent(TypedDict):

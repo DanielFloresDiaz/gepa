@@ -33,7 +33,7 @@ result = gepa.optimize(
 
 ### `"epsilon_greedy"`
 
-With probability `epsilon` (default 0.1), selects a random candidate; otherwise picks the best by aggregate score. Provides a simple exploration/exploitation trade-off.
+With probability `epsilon` (default 0.1), selects a random candidate; otherwise picks the best by acceptance score. Provides a simple exploration/exploitation trade-off.
 
 ```python
 result = gepa.optimize(
@@ -44,7 +44,7 @@ result = gepa.optimize(
 
 ### `"top_k_pareto"`
 
-Restricts Pareto selection to the top K candidates by aggregate score (default K=5), then applies the same weighted-frequency sampling as `"pareto"`. Useful when your candidate pool is large and you want Pareto diversity but only among high-performing candidates.
+Restricts Pareto selection to the top K candidates by acceptance score (default K=5), then applies the same weighted-frequency sampling as `"pareto"`. Useful when your candidate pool is large and you want Pareto diversity but only among high-performing candidates.
 
 ```python
 result = gepa.optimize(
@@ -179,10 +179,11 @@ Inside `select_candidate_idx`, you have access to the full optimization state:
 | Field | Type | Description |
 |---|---|---|
 | `state.program_candidates` | `list[dict[str, str]]` | All candidates (index = program index) |
-| `state.program_full_scores_val_set` | `list[float]` | Aggregate validation score per candidate |
-| `state.per_program_tracked_scores` | `list[float]` | Tracked scores used for ranking |
+| `state.program_full_acceptance_scores_val_set` | `list[float]` | Per-candidate acceptance score used for ranking |
+| `state.per_program_tracked_scores` | `list[float]` | Alias of `program_full_acceptance_scores_val_set` |
 | `state.prog_candidate_objective_scores` | `list[dict[str, float]]` | Per-objective scores per candidate |
-| `state.prog_candidate_val_subscores` | `list[dict[DataId, float]]` | Per-example scores per candidate |
+| `state.prog_candidate_per_example_scores` | `list[dict[DataId, float]]` | Raw per-example metric scores per candidate |
+| `state.prog_candidate_per_example_acceptance_scores` | `list[dict[DataId, float]]` | Per-example acceptance scores per candidate |
 | `state.get_pareto_front_mapping()` | `dict[FrontierKey, set[int]]` | Built-in per-key frontier mapping |
 
 ### Example: true multi-objective non-dominated selector
@@ -204,9 +205,9 @@ class NonDominatedSelector(CandidateSelector):
     def select_candidate_idx(self, state: GEPAState) -> int:
         scores = state.prog_candidate_objective_scores
         if not scores or not scores[0]:
-            # No objective scores available; fall back to best aggregate
-            return state.program_full_scores_val_set.index(
-                max(state.program_full_scores_val_set)
+            # No objective scores available; fall back to best acceptance score
+            return state.program_full_acceptance_scores_val_set.index(
+                max(state.program_full_acceptance_scores_val_set)
             )
 
         objectives = list(scores[0].keys())
@@ -250,7 +251,7 @@ config = GEPAConfig(
 ```
 
 !!! tip "Combining with per-example diversity"
-    You can extend `NonDominatedSelector` to also consider per-example subscores from `state.prog_candidate_val_subscores`, or weight candidates by their crowding distance (how isolated they are in objective space) to favor under-explored regions of the Pareto front.
+    You can extend `NonDominatedSelector` to also consider per-example subscores from `state.prog_candidate_per_example_scores`, or weight candidates by their crowding distance (how isolated they are in objective space) to favor under-explored regions of the Pareto front.
 
 ---
 

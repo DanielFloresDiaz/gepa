@@ -211,8 +211,8 @@ class ReflectiveMutationProposer(ProposeNewCandidate[DataId]):
 
         curr_prog_id = self.candidate_selector.select_candidate_idx(state)
         curr_prog = state.program_candidates[curr_prog_id]
-        curr_prog_score = state.program_full_scores_val_set[curr_prog_id]
-        self.logger.log(f"Iteration {i}: Selected program {curr_prog_id} score: {curr_prog_score}")
+        curr_prog_score = state.program_full_acceptance_scores_val_set[curr_prog_id]
+        self.logger.log(f"Iteration {i}: Selected program {curr_prog_id} acceptance score: {curr_prog_score}")
 
         notify_callbacks(
             self.callbacks,

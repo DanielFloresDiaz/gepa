@@ -110,7 +110,7 @@ def main():
     )
 
     best_agent_code = result.best_candidate
-    print(f"\nBest score (on val): {result.val_aggregate_scores[result.best_idx]:.4f}")
+    print(f"\nBest score (on val): {result.val_acceptance_scores[result.best_idx]:.4f}")
 
     with open(f"{log_dir}/best_agent.py", "w") as f:
         f.write(best_agent_code)

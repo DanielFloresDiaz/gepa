@@ -280,6 +280,6 @@ if __name__ == "__main__":
     )
 
     print(f"\nBest candidate: {result.best_candidate}")
-    print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+    print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
     print(f"Total metric calls: {result.total_metric_calls}")
     print(f"Actual fitness_fn calls: {call_counter['count']}")

@@ -57,7 +57,7 @@ result = gepa.optimize(
 
 # Get the optimized prompt and best score
 print("Best prompt:", result.best_candidate['system_prompt'])
-print("Best score:", result.val_aggregate_scores[result.best_idx])
+print("Best score:", result.val_acceptance_scores[result.best_idx])
 ```
 
 ### Option 2: Using optimize_anything
@@ -172,8 +172,10 @@ The `GEPAResult` object contains:
 ```python
 result.best_candidate                          # the optimized text components (or str when seed was a str)
 result.best_idx                                # int — index of the best candidate
-result.val_aggregate_scores                    # list[float] — per-candidate average validation score
-result.val_aggregate_scores[result.best_idx]   # float — best score
+result.val_acceptance_scores                    # list[float] — per-candidate acceptance ranking score (seed is 1.0)
+result.val_acceptance_scores[result.best_idx]   # float — best acceptance score
+result.val_per_example_scores                   # list[dict] — raw per-example metric scores
+result.val_per_example_acceptance_scores        # list[dict] — per-example acceptance scores
 result.candidates                              # list of all explored candidates
 result.per_val_instance_best_candidates        # dict mapping val_id -> set of candidates on the Pareto frontier
 result.total_metric_calls                      # int — total evaluation calls used

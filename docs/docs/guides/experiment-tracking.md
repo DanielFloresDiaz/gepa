@@ -75,16 +75,19 @@ GEPA integrates with [Weights & Biases](https://wandb.ai) and [MLflow](https://m
 
 ### Scalar Metrics (line charts)
 
-Every iteration GEPA logs scalars you can plot over time:
+Every iteration GEPA logs scalars you can plot over time. Ranking uses **acceptance** scores (seed is 1.0). **Raw aggregate** is the mean of per-example adapter metric scores.
 
 | Metric | Description |
 |--------|-------------|
-| `val_program_average` | Average valset score for the current candidate |
-| `best_score_on_valset` | Best valset score found so far |
-| `valset_pareto_front_agg` | Pareto-frontier aggregate score |
-| `subsample/before` | Reflection minibatch score before mutation |
-| `subsample/after` | Reflection minibatch score after mutation |
+| `val_acceptance_score` | 1-centered acceptance score for the current candidate |
+| `val_raw_aggregate` | Mean of raw per-example validation metric scores |
+| `best_acceptance_score_on_valset` | Best acceptance score found so far |
+| `valset_pareto_front_acceptance` | Mean of the instance Pareto front (per-example acceptance) |
+| `subsample_score` | Raw minibatch metric sum before mutation |
+| `new_subsample_score` | Raw minibatch metric sum after mutation |
 | `total_metric_calls` | Cumulative evaluator calls |
+
+Legacy aliases (same values as the acceptance series, kept for existing dashboards): `val_program_average`, `best_score_on_valset`, `valset_pareto_front_agg`.
 
 ### Structured Tables
 
@@ -99,7 +102,9 @@ One row per **accepted** candidate.  Join on `candidate_idx` to link to other ta
 | `iteration` | Iteration number |
 | `candidate_idx` | Candidate index (0 = seed) |
 | `parent_ids` | Parent candidate indices |
-| `valset_score` | Aggregate validation score |
+| `acceptance_score` | 1-centered acceptance score used for ranking |
+| `raw_aggregate` | Mean of raw per-example validation metric scores |
+| `valset_score` | Evaluation-policy valset score (acceptance under the default policy) |
 | `is_best` | Whether this is the current best |
 | `text:<component>` | The full text of each optimized component |
 
@@ -114,8 +119,8 @@ One row per **reflection LM call** — both accepted and rejected proposals.  Th
 | `status` | `"accepted"` or `"rejected"` |
 | `candidate_idx` | Accepted: index in `candidates` table.  Rejected: `-1` |
 | `parent_ids` | Parent candidate the proposal was based on |
-| `subsample_score_before` | Minibatch score before mutation |
-| `subsample_score_after` | Minibatch score after mutation |
+| `subsample_score_before` | Raw minibatch metric sum before mutation |
+| `subsample_score_after` | Raw minibatch metric sum after mutation |
 | `prompt` | Full prompt sent to the reflection LM |
 | `raw_lm_output` | Raw response from the reflection LM |
 | `proposed_text` | The extracted new instruction text |
@@ -124,16 +129,22 @@ One row per **reflection LM call** — both accepted and rejected proposals.  Th
     Filter `proposals` where `status == "accepted"` then join on `candidate_idx`
     to see which LM call produced each candidate in the `candidates` table.
 
-#### `valset_scores`, `valset_pareto_front`, `objective_scores`, `objective_pareto_front`
+#### `valset_scores`, `valset_acceptance_scores`, `valset_pareto_front`, `objective_scores`, `objective_pareto_front`
 
-Per-example and per-objective scores logged as growing matrix tables.  See the
-[GEPA paper](https://arxiv.org/abs/2507.19457) for how Pareto frontiers are used.
+Growing matrix tables:
+
+- `valset_scores` — raw per-example metric scores
+- `valset_acceptance_scores` — per-example 1-centered acceptance scores
+- `valset_pareto_front` — instance Pareto front (`best_score` is per-example **acceptance**)
+- `objective_scores` / `objective_pareto_front` — per-objective aggregates, not acceptance
+
+See the [GEPA paper](https://arxiv.org/abs/2507.19457) for how Pareto frontiers are used.
 
 ### Run Summary
 
 At the end of optimization GEPA logs:
 
-- `best_candidate_idx`, `best_valset_score`, `total_iterations`, `total_candidates`
+- `best_candidate_idx`, `best_acceptance_score`, `best_raw_aggregate`, `best_valset_score` (policy score; acceptance under the default policy), `total_iterations`, `total_candidates`
 - `seed/<component>` — the original seed text for each component
 - `best/<component>` — the best-found text for each component
 
@@ -287,7 +298,7 @@ silently fail.
         )
 
         # Still works — run was never closed by GEPA
-        mlflow.log_metric("final_score", result.val_aggregate_scores[result.best_idx])
+        mlflow.log_metric("final_score", result.val_acceptance_scores[result.best_idx])
     ```
 
 !!! tip "What gets logged in attach mode"
@@ -317,7 +328,7 @@ so they don't collide with the caller's metrics:
             )
         ),
     )
-    # wandb will show: gepa/val_score, gepa/candidates (table), gepa/candidate_tree, …
+    # wandb will show: gepa/val_acceptance_score, gepa/val_raw_aggregate, gepa/candidates (table), gepa/candidate_tree, …
     ```
 
 === "gepa.optimize"

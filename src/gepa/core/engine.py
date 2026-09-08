@@ -27,17 +27,29 @@ from gepa.core.callbacks import (
     notify_callbacks,
 )
 from gepa.core.data_loader import DataId, DataLoader, ensure_loader
-from gepa.core.state import EvaluationCache, FrontierType, GEPAState, ValsetEvaluation, initialize_gepa_state
+from gepa.core.state import (
+    SEED_ACCEPTANCE_SCORE,
+    EvaluationCache,
+    FrontierType,
+    GEPAState,
+    ValsetEvaluation,
+    initialize_gepa_state,
+)
 from gepa.logging.experiment_tracker import ExperimentTracker
 from gepa.logging.logger import LoggerProtocol
 from gepa.logging.utils import log_detailed_metrics_after_discovering_new_program
-from gepa.proposer.base import CandidateProposal
+from gepa.proposer.base import CandidateProposal, SubsampleEvaluation
 from gepa.proposer.merge import MergeProposer
 from gepa.proposer.reflective_mutation.reflective_mutation import (
     ProposalOutput,
     ReflectiveMutationProposer,
 )
-from gepa.strategies.acceptance import AcceptanceCriterion, ImprovementOrEqualAcceptance, StrictImprovementAcceptance
+from gepa.strategies.acceptance import (
+    AcceptanceCriterion,
+    ImprovementOrEqualAcceptance,
+    StrictImprovementAcceptance,
+    mean_improvement,
+)
 from gepa.strategies.eval_policy import EvaluationPolicy, FullEvaluationPolicy
 from gepa.utils import StopperProtocol
 
@@ -172,6 +184,112 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             objective_scores_by_val_id=objective_by_val_idx,
         )
 
+    @staticmethod
+    def _parent_indices(parent_program_idx: list[int]) -> list[int]:
+        return list(parent_program_idx) if parent_program_idx else [0]
+
+    @staticmethod
+    def _mean_parent_acceptance_score(
+        state: GEPAState[RolloutOutput, DataId, CandidateT],
+        parent_indices: list[int],
+    ) -> float:
+        acc = state.prog_candidate_acceptance_scores
+        return sum(acc[idx] for idx in parent_indices) / len(parent_indices)
+
+    @staticmethod
+    def _mean_scores_for_ids(score_dicts: list[dict[DataId, float]], aligned_ids: list[DataId]) -> list[float]:
+        n = len(score_dicts)
+        return [sum(scores[val_id] for scores in score_dicts) / n for val_id in aligned_ids]
+
+    @staticmethod
+    def _mean_objectives_for_ids(
+        objective_dicts: list[dict[DataId, dict[str, float]]],
+        aligned_ids: list[DataId],
+    ) -> list[dict[str, float]]:
+        n = len(objective_dicts)
+        averaged: list[dict[str, float]] = []
+        for val_id in aligned_ids:
+            keys: set[str] = set()
+            for objective_dict in objective_dicts:
+                keys.update(objective_dict.get(val_id, {}).keys())
+            averaged.append(
+                {
+                    key: sum(objective_dict.get(val_id, {}).get(key, 0.0) for objective_dict in objective_dicts) / n
+                    for key in keys
+                }
+            )
+        return averaged
+
+    def _full_eval_proposal(
+        self,
+        state: GEPAState[RolloutOutput, DataId, CandidateT],
+        parent_indices: list[int],
+        child_eval: ValsetEvaluation[RolloutOutput, DataId],
+        candidate: dict[str, CandidateT],
+        parent_program_ids: list[int],
+    ) -> CandidateProposal[DataId, CandidateT]:
+        parent_score_dicts = [state.prog_candidate_per_example_scores[idx] for idx in parent_indices]
+        aligned_ids = [
+            val_id for val_id in child_eval.scores_by_val_id if all(val_id in scores for scores in parent_score_dicts)
+        ]
+        before_scores = self._mean_scores_for_ids(parent_score_dicts, aligned_ids)
+        after_scores = [child_eval.scores_by_val_id[val_id] for val_id in aligned_ids]
+
+        parent_objs = [state.prog_candidate_objective_subscores[idx] for idx in parent_indices]
+        child_obj = child_eval.objective_scores_by_val_id
+        before_obj: list[dict[str, float]] | None = None
+        after_obj: list[dict[str, float]] | None = None
+        if child_obj is not None:
+            present_objs: list[dict[DataId, dict[str, float]]] = []
+            missing_parent_obj = False
+            for parent_obj in parent_objs:
+                if parent_obj is None:
+                    missing_parent_obj = True
+                    break
+                present_objs.append(parent_obj)
+            if not missing_parent_obj and present_objs:
+                before_obj = self._mean_objectives_for_ids(present_objs, aligned_ids)
+                after_obj = [child_obj.get(val_id, {}) for val_id in aligned_ids]
+
+        return CandidateProposal(
+            candidate=candidate,
+            parent_program_ids=parent_program_ids,
+            subsample_indices=aligned_ids,
+            subsample_scores_before=before_scores,
+            subsample_scores_after=after_scores,
+            eval_before=SubsampleEvaluation(scores=before_scores, outputs=[], objective_scores=before_obj),
+            eval_after=SubsampleEvaluation(scores=after_scores, outputs=[], objective_scores=after_obj),
+            tag="full_eval",
+        )
+
+    def _derived_per_example_acceptance_scores(
+        self,
+        state: GEPAState[RolloutOutput, DataId, CandidateT],
+        parent_indices: list[int],
+        child_raw: dict[DataId, float],
+        deltas_by_id: dict[DataId, float],
+    ) -> dict[DataId, float]:
+        """Derive per-example acceptance scores for a newly evaluated child.
+
+        For each ``val_id`` in ``child_raw``, the score is
+        ``mean(parent_acc[val_id]) + deltas_by_id[val_id]`` when at least one
+        parent has that id. Under the default full-valset evaluation policy every
+        parent should cover all ids and the fallback branch should not run.
+
+        When no parent has ``val_id`` (incremental or dynamic valset eval), the
+        child-only id receives ``SEED_ACCEPTANCE_SCORE`` as a neutral 1.0
+        baseline with no parent delta and no improvement term.
+        """
+        parent_subs_list = [state.prog_candidate_per_example_acceptance_scores[idx] for idx in parent_indices]
+        derived: dict[DataId, float] = {}
+        for val_id in child_raw:
+            present = [subs[val_id] for subs in parent_subs_list if val_id in subs]
+            if present:
+                derived[val_id] = (sum(present) / len(present)) + deltas_by_id.get(val_id, 0.0)
+            else:
+                derived[val_id] = SEED_ACCEPTANCE_SCORE
+        return derived
+
     def _run_full_eval_and_add(
         self,
         new_program: dict[str, CandidateT],
@@ -181,6 +299,16 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         num_metric_calls_by_discovery = state.total_num_evals
         valset_evaluation = self._evaluate_on_valset(new_program, state)
         state.num_full_ds_evals += 1
+
+        parent_indices = self._parent_indices(parent_program_idx)
+        full_proposal = self._full_eval_proposal(
+            state, parent_indices, valset_evaluation, new_program, parent_program_idx
+        )
+        deltas = self.acceptance_criterion.improvement(full_proposal, state)
+        acceptance_score = self._mean_parent_acceptance_score(state, parent_indices) + mean_improvement(deltas)
+        per_example_acceptance_scores = self._derived_per_example_acceptance_scores(
+            state, parent_indices, valset_evaluation.scores_by_val_id, deltas
+        )
 
         # Snapshot Pareto front before update
         front_before = state.get_pareto_front_mapping()
@@ -194,6 +322,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             valset_evaluation=valset_evaluation,
             run_dir=self.run_dir,
             num_metric_calls_by_discovery_of_new_program=num_metric_calls_by_discovery,
+            acceptance_score=acceptance_score,
+            per_example_acceptance_scores=per_example_acceptance_scores,
         )
 
         # Compute best program immediately after state update (before callbacks)
@@ -201,6 +331,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         valset_score = self.val_evaluation_policy.get_valset_score(new_program_idx, state)
         linear_pareto_front_program_idx = self.val_evaluation_policy.get_best_program(state)
         is_best_program = new_program_idx == linear_pareto_front_program_idx
+        raw_aggregate, _ = state.get_program_average_val_subset(new_program_idx)
 
         # Snapshot Pareto front after update and notify callback
         front_after = state.get_pareto_front_mapping()
@@ -225,7 +356,10 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         state.full_program_trace[-1]["evaluated_val_indices"] = sorted(valset_evaluation.scores_by_val_id.keys())
 
         if is_best_program:
-            self.logger.log(f"Iteration {state.i + 1}: Found a better program on the valset with score {valset_score}.")
+            self.logger.log(
+                f"Iteration {state.i + 1}: Found a better program on the valset "
+                f"(acceptance {acceptance_score}, raw aggregate {raw_aggregate})."
+            )
 
         valset = self.valset
         assert valset is not None
@@ -246,6 +380,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
                 outputs_by_val_id=(
                     dict(valset_evaluation.outputs_by_val_id) if valset_evaluation.outputs_by_val_id else None
                 ),
+                acceptance_score=acceptance_score,
+                raw_aggregate=raw_aggregate,
             ),
         )
 
@@ -261,15 +397,24 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             val_evaluation_policy=self.val_evaluation_policy,
         )
 
-        # Log candidate table row with instructions and metadata
+        # Log candidate table row with instructions and metadata.
+        # valset_score remains the evaluation-policy score (acceptance under the default policy).
         component_names = sorted(new_program.keys())
-        columns = ["iteration", "candidate_idx", "parent_ids", "valset_score", "is_best"] + [
-            f"text:{name}" for name in component_names
-        ]
+        columns = [
+            "iteration",
+            "candidate_idx",
+            "parent_ids",
+            "acceptance_score",
+            "raw_aggregate",
+            "valset_score",
+            "is_best",
+        ] + [f"text:{name}" for name in component_names]
         row = [
             state.i + 1,
             new_program_idx,
             str(parent_program_idx),
+            acceptance_score,
+            raw_aggregate,
             valset_score,
             is_best_program,
         ] + [new_program[name] for name in component_names]
@@ -284,6 +429,30 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
     # Reflective proposal acceptance (shared by single and parallel paths)
     # ------------------------------------------------------------------
 
+    def _uses_builtin_acceptance_criterion(self) -> bool:
+        return isinstance(self.acceptance_criterion, StrictImprovementAcceptance | ImprovementOrEqualAcceptance)
+
+    def _acceptance_log_metrics(
+        self,
+        proposal: CandidateProposal,
+        state: GEPAState[RolloutOutput, DataId, CandidateT],
+    ) -> tuple[float, float, float, float | None]:
+        """Return ``(old_sum, new_sum, mean_delta, stagnation_bonus)`` for acceptance logging.
+
+        ``mean_delta`` is ``mean(improvement())``. ``stagnation_bonus`` is
+        returned when the criterion exposes ``_compute_stagnation_bonus`` and
+        ``stagnation_bonus_enabled`` is true; otherwise ``None``.
+        """
+        old_sum = sum(proposal.subsample_scores_before)
+        new_sum = sum(proposal.subsample_scores_after)
+        mean_delta = mean_improvement(self.acceptance_criterion.improvement(proposal, state))
+        stagnation_bonus: float | None = None
+        if getattr(self.acceptance_criterion, "stagnation_bonus_enabled", False):
+            compute_bonus = getattr(self.acceptance_criterion, "_compute_stagnation_bonus", None)
+            if compute_bonus is not None:
+                stagnation_bonus = float(compute_bonus(state))
+        return old_sum, new_sum, mean_delta, stagnation_bonus
+
     def _accept_reflective_proposal(
         self,
         proposal: CandidateProposal,
@@ -294,19 +463,28 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
 
         Returns True if the proposal was accepted.
         """
-        old_sum = sum(proposal.subsample_scores_before or [])
-        new_sum = sum(proposal.subsample_scores_after or [])
-        _uses_builtin_criterion = isinstance(
-            self.acceptance_criterion, StrictImprovementAcceptance | ImprovementOrEqualAcceptance
-        )
+        old_sum, new_sum, mean_delta, stagnation_bonus = self._acceptance_log_metrics(proposal, state)
+        uses_builtin = self._uses_builtin_acceptance_criterion()
 
         if not self.acceptance_criterion.should_accept(proposal, state):
-            if _uses_builtin_criterion:
-                reject_msg = f"Iteration {iteration}: New subsample score {new_sum} is not better than old score {old_sum}, skipping"
+            if uses_builtin:
+                reject_msg = (
+                    f"Iteration {iteration}: New subsample score {new_sum} is not better than "
+                    f"old score {old_sum}, skipping"
+                )
                 reject_reason = f"New subsample score {new_sum} not better than old score {old_sum}"
             else:
-                reject_msg = f"Iteration {iteration}: Candidate rejected by acceptance criterion (old_sum={old_sum}, new_sum={new_sum}), skipping"
-                reject_reason = f"Candidate rejected by acceptance criterion (old_sum={old_sum}, new_sum={new_sum})"
+                bonus_suffix = (
+                    f", stagnation bonus {stagnation_bonus:.4f}" if stagnation_bonus is not None else ""
+                )
+                reject_msg = (
+                    f"Iteration {iteration}: Candidate rejected by acceptance criterion "
+                    f"(mean improvement {mean_delta:.4f}{bonus_suffix}), skipping"
+                )
+                reject_reason = (
+                    f"Candidate rejected by acceptance criterion "
+                    f"(mean improvement {mean_delta:.4f}{bonus_suffix}, threshold > 0)"
+                )
             self.logger.log(reject_msg)
             self._log_proposal_lm_calls(iteration, proposal, candidate_idx=-1)
             notify_callbacks(
@@ -321,10 +499,18 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             )
             return False
 
-        if _uses_builtin_criterion:
-            accept_msg = f"Iteration {iteration}: New subsample score {new_sum} is better than old score {old_sum}. Continue to full eval and add to candidate pool."
+        if uses_builtin:
+            accept_msg = (
+                f"Iteration {iteration}: New subsample score {new_sum} is better than old score {old_sum}. "
+                "Continue to full eval and add to candidate pool."
+            )
         else:
-            accept_msg = f"Iteration {iteration}: Candidate accepted (old_sum={old_sum}, new_sum={new_sum}). Continue to full eval and add to candidate pool."
+            bonus_suffix = f", stagnation bonus {stagnation_bonus:.4f}" if stagnation_bonus is not None else ""
+            accept_msg = (
+                f"Iteration {iteration}: Candidate accepted "
+                f"(mean improvement {mean_delta:.4f}{bonus_suffix}). "
+                "Continue to full eval and add to candidate pool."
+            )
         self.logger.log(accept_msg)
 
         new_idx, _ = self._run_full_eval_and_add(
@@ -559,34 +745,30 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             }
         )
 
-        # Log base program score using the same metric names as subsequent iterations
-        # so they appear on the same charts in wandb/mlflow
-        base_val_avg, base_val_coverage = state.get_program_average_val_subset(0)
-        pareto_scores = list(state.pareto_front_valset.values())
-        base_pareto_avg = sum(pareto_scores) / len(pareto_scores) if pareto_scores else base_val_avg
-        self.experiment_tracker.log_metrics(
-            {
-                "val_program_average": base_val_avg,
-                "best_score_on_valset": base_val_avg,
-                "val_evaluated_count_new_program": base_val_coverage,
-                "val_total_count": len(valset),
-                "total_metric_calls": state.total_num_evals,
-                "valset_pareto_front_agg": base_pareto_avg,
-                "new_program_idx": 0,
-                "linear_pareto_front_program_idx": 0,
-                "best_program_as_per_agg_score_valset": 0,
-            },
-            step=state.i + 1,
-        )
-
-        self.logger.log(
-            f"Iteration {state.i + 1}: Base program full valset score: {base_val_avg} "
-            f"over {base_val_coverage} / {len(valset)} examples"
+        # Log seed scores with the same metric names as later iterations
+        # so they appear on the same charts in wandb/mlflow.
+        seed_raw_scores = dict(state.prog_candidate_per_example_scores[0])
+        seed_raw_aggregate, seed_coverage = state.get_program_average_val_subset(0)
+        seed_acceptance = state.prog_candidate_acceptance_scores[0]
+        seed_policy_score = self.val_evaluation_policy.get_valset_score(0, state)
+        log_detailed_metrics_after_discovering_new_program(
+            logger=self.logger,
+            gepa_state=state,
+            new_program_idx=0,
+            valset_evaluation=ValsetEvaluation(
+                outputs_by_val_id={},
+                scores_by_val_id=seed_raw_scores,
+            ),
+            objective_scores=state.prog_candidate_objective_scores[0],
+            experiment_tracker=self.experiment_tracker,
+            linear_pareto_front_program_idx=0,
+            valset_size=len(valset),
+            val_evaluation_policy=self.val_evaluation_policy,
+            program_label="seed",
         )
 
         # Notify callbacks of seed candidate's initial valset evaluation (iteration 0)
         # This provides the baseline performance before any optimization
-        seed_scores = state.prog_candidate_val_subscores[0]
         notify_callbacks(
             self.callbacks,
             "on_valset_evaluated",
@@ -594,13 +776,15 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
                 iteration=0,
                 candidate_idx=0,
                 candidate=self.seed_candidate,
-                scores_by_val_id=dict(seed_scores),
-                average_score=base_val_avg,
-                num_examples_evaluated=len(seed_scores),
+                scores_by_val_id=seed_raw_scores,
+                average_score=seed_policy_score,
+                num_examples_evaluated=seed_coverage,
                 total_valset_size=len(valset),
                 parent_ids=[],
                 is_best_program=True,  # Seed is always best at iteration 0
                 outputs_by_val_id=None,  # Outputs not tracked at initialization unless track_best_outputs=True
+                acceptance_score=seed_acceptance,
+                raw_aggregate=seed_raw_aggregate,
             ),
         )
 
@@ -668,11 +852,14 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
                         self.merge_proposer.last_iter_found_new_program = False  # old behavior
 
                         if proposal is not None and proposal.tag == "merge":
-                            parent_sums = proposal.subsample_scores_before or [
-                                float("-inf"),
-                                float("-inf"),
+                            parent_sums = [
+                                sum(
+                                    state.prog_candidate_per_example_scores[parent_id][val_id]
+                                    for val_id in proposal.subsample_indices
+                                )
+                                for parent_id in proposal.parent_program_ids
                             ]
-                            new_sum = sum(proposal.subsample_scores_after or [])
+                            new_sum = sum(proposal.subsample_scores_after)
 
                             # Notify merge attempted
                             notify_callbacks(
@@ -802,8 +989,12 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         # Log final summary: seed candidate, best candidate, and all candidates table
         best_candidate = state.program_candidates[best_candidate_idx]
         best_score = self.val_evaluation_policy.get_valset_score(best_candidate_idx, state)
+        best_acceptance = state.prog_candidate_acceptance_scores[best_candidate_idx]
+        best_raw_aggregate, _ = state.get_program_average_val_subset(best_candidate_idx)
         summary: dict[str, Any] = {
             "best_candidate_idx": best_candidate_idx,
+            "best_acceptance_score": best_acceptance,
+            "best_raw_aggregate": best_raw_aggregate,
             "best_valset_score": best_score,
             "total_iterations": state.i,
             "total_candidates": len(state.program_candidates),
@@ -834,8 +1025,8 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             return
 
         status = "accepted" if candidate_idx >= 0 else "rejected"
-        subsample_before = sum(proposal.subsample_scores_before or [])
-        subsample_after = sum(proposal.subsample_scores_after or [])
+        subsample_before = sum(proposal.subsample_scores_before)
+        subsample_after = sum(proposal.subsample_scores_after)
         parent_ids_str = str(proposal.parent_program_ids)
 
         rows = []

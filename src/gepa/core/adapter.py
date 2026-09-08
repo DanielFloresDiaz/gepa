@@ -28,8 +28,12 @@ class EvaluationBatch(Generic[Trajectory, RolloutOutput]):
 
     - outputs: raw per-example outputs from upon executing the candidate. GEPA does not interpret these;
       they are forwarded to other parts of the user's code or logging as-is.
-    - scores: per-example numeric scores (floats). GEPA sums these for minibatch acceptance
-      and averages them over the full validation set for tracking/pareto fronts.
+    - scores: per-example numeric scores (floats). Default minibatch acceptance
+      uses the mean of these scores. After a candidate is added, Pareto ranking
+      and ``best_idx`` use acceptance scores (seed centered at 1.0, then mean
+      of parent acceptance scores + mean of per-example
+      ``AcceptanceCriterion.improvement`` on the full val eval). Raw per-example scores remain available on the result as
+      ``val_per_example_scores``.
     - trajectories: optional per-example traces used by make_reflective_dataset to build
       a reflective dataset (See `GEPAAdapter.make_reflective_dataset`). If capture_traces=True is passed to `evaluate`, trajectories
       should be provided and align one-to-one with `outputs` and `scores`.
@@ -113,10 +117,12 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput, CandidateT]):
     Key concepts and contracts:
     - candidate: Dict[str, CandidateT] mapping a named component of the system to its current value.
       When CandidateT=str (the default) this is a plain dict[str, str].
-    - scores: higher is better. GEPA uses:
-      - minibatch: sum(scores) to compare old vs. new candidate (acceptance test),
-      - full valset: mean(scores) for tracking and Pareto-front selection.
-      Ensure your metric is calibrated accordingly or normalized to a consistent scale.
+    - scores: higher is better. Default minibatch acceptance uses the mean of
+      these scores. After a candidate is added, Pareto ranking and ``best_idx``
+      use 1-centered acceptance scores (seed is 1.0, then mean of parent
+      acceptance scores + mean of per-example ``AcceptanceCriterion.improvement``
+      on the full val eval). Raw per-example scores remain on ``GEPAResult.val_per_example_scores``. Ensure
+      your metric is calibrated accordingly or normalized to a consistent scale.
     - trajectories: opaque to GEPA (the engine never inspects them). They must be
       consumable by your own make_reflective_dataset implementation to extract the
       minimal context needed to produce meaningful feedback for every component of

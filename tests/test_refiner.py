@@ -146,7 +146,7 @@ class TestRefiner:
             f"\n[Refiner no cache] Metric calls: {result.total_metric_calls}, Actual fitness calls: {call_counter['count']}"
         )
         print(f"Best candidate: {result.best_candidate}")
-        print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+        print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
 
     def test_refiner_with_memory_cache(self):
         """Test refiner works with memory caching."""
@@ -180,7 +180,7 @@ class TestRefiner:
             f"\n[Refiner + memory cache] Metric calls: {result.total_metric_calls}, Actual fitness calls: {call_counter['count']}"
         )
         print(f"Best candidate: {result.best_candidate}")
-        print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+        print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
 
     def test_refiner_with_disk_cache(self):
         """Test refiner works with disk caching."""
@@ -216,7 +216,7 @@ class TestRefiner:
                 f"\n[Refiner + disk cache] Metric calls: {result.total_metric_calls}, Actual fitness calls: {call_counter['count']}"
             )
             print(f"Best candidate: {result.best_candidate}")
-            print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+            print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
 
             # Verify cache files created
             cache_dir = Path(tmp_dir) / "fitness_cache"
@@ -345,7 +345,7 @@ class TestRefiner:
         assert "param_a" in result.best_candidate
         assert "param_b" in result.best_candidate
         print(f"\n[Multi-param] Best candidate: {result.best_candidate}")
-        print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+        print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
 
     def test_side_info_structure(self):
         """Test that side_info has user's structure with refiner_prompt_specific_info added.
@@ -639,7 +639,7 @@ class TestRefinerWithDataset:
 
         assert result is not None
         assert "refiner_prompt" in result.best_candidate
-        best_score = result.val_aggregate_scores[result.best_idx]
+        best_score = result.val_acceptance_scores[result.best_idx]
         print(f"\n[Single-instance] Best: {result.best_candidate['number']}, Score: {best_score}")
         print(f"Metric calls: {result.total_metric_calls}, Fitness calls: {call_counter['count']}")
 
@@ -669,7 +669,7 @@ class TestRefinerWithDataset:
 
         assert result is not None
         assert "refiner_prompt" in result.best_candidate
-        best_score = result.val_aggregate_scores[result.best_idx]
+        best_score = result.val_acceptance_scores[result.best_idx]
         print(f"\n[Dataset mode] Best: {result.best_candidate['number']}, Score: {best_score}")
         print(f"Metric calls: {result.total_metric_calls}, Fitness calls: {call_counter['count']}")
 
@@ -705,7 +705,7 @@ class TestRefinerFrontierTypes:
 
         assert result is not None
         assert "refiner_prompt" in result.best_candidate
-        best_score = result.val_aggregate_scores[result.best_idx]
+        best_score = result.val_acceptance_scores[result.best_idx]
         print(f"\n[{frontier_type}] Best: {result.best_candidate['number']}, Score: {best_score}")
         print(f"Metric calls: {result.total_metric_calls}, Fitness calls: {call_counter['count']}")
 
@@ -827,6 +827,6 @@ if __name__ == "__main__":
     )
 
     print(f"\nBest candidate: {result.best_candidate}")
-    print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+    print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
     print(f"Total metric calls: {result.total_metric_calls}")
     print(f"Actual fitness_fn calls: {call_counter['count']}")
