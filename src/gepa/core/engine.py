@@ -583,7 +583,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         # First context uses the iteration slot already created by the caller
         trace_entry_0 = state.full_program_trace[-1]
         ctx_0 = self.reflective_proposer.prepare_proposal(state)
-        trace_entry_0["selected_program_candidate"] = ctx_0.curr_prog_id
+        trace_entry_0["selected_program_candidate"] = ctx_0.curr_candidate_idx
         trace_entry_0["subsample_ids"] = ctx_0.subsample_ids
         contexts.append(ctx_0)
         trace_entries.append(trace_entry_0)
@@ -595,7 +595,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             trace_entry: dict[str, Any] = {"i": state.i}
             state.full_program_trace.append(trace_entry)
             ctx = self.reflective_proposer.prepare_proposal(state)
-            trace_entry["selected_program_candidate"] = ctx.curr_prog_id
+            trace_entry["selected_program_candidate"] = ctx.curr_candidate_idx
             trace_entry["subsample_ids"] = ctx.subsample_ids
             contexts.append(ctx)
             trace_entries.append(trace_entry)

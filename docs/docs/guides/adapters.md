@@ -7,6 +7,30 @@
 
 GEPA can optimize any system consisting of text components by implementing the `GEPAAdapter` protocol. This guide explains how to create custom adapters.
 
+## Concepts and naming
+
+GEPA uses a consistent vocabulary across adapters, proposers, and callbacks:
+
+- **candidate** — a full `dict[str, CandidateT]` representing one complete system configuration (all components set at once).
+- **component** — a named key in a candidate (for example `"instructions"` or `"system_prompt"`).
+- **component value** — the value stored for one component. When `CandidateT` is `str` (the default), this is text; other types are supported for structured components.
+- **proposed improvement(s)** — a partial `dict[str, CandidateT]` returned by `propose_improvements` or a custom `ProposalFn`. It updates one or more components only, not the full candidate.
+- **child candidate** — the parent candidate with proposed improvements applied (built inside reflective mutation after a proposal step).
+
+Avoid referring to the partial proposal step as a "new candidate" or "new text" — those terms describe the full child candidate or text-specific defaults, not the output of `propose_improvements`.
+
+### Legacy state field names
+
+Some internal state and checkpoint fields predate this vocabulary and are kept for compatibility:
+
+| Legacy name | Meaning |
+|---|---|
+| `program_candidates` | List of all candidates |
+| `list_of_named_predictors` | Ordered component names from the seed candidate |
+| `selected_program_candidate` | Index of the candidate selected for mutation (trace/metrics) |
+
+New code and public APIs prefer **candidate** and **component**.
+
 ## The GEPAAdapter Protocol
 
 Every adapter must implement two methods:

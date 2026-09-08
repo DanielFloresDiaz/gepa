@@ -157,11 +157,31 @@ class ProposalEndEvent(TypedDict):
     """Event for on_proposal_end callback."""
 
     iteration: int
+    proposed_improvements: dict[str, Any]
+    """Per-component values proposed by ``propose_improvements`` (component name → new value)."""
     new_instructions: dict[str, Any]
+    """Deprecated alias for ``proposed_improvements``. Will be removed in a future release."""
     prompts: dict[str, str | list[dict[str, Any]]]
     """Per-component prompts sent to the reflection LM (component name → rendered prompt)."""
     raw_lm_outputs: dict[str, str]
     """Per-component raw LM outputs before extraction (component name → raw text)."""
+
+
+def make_proposal_end_event(
+    *,
+    iteration: int,
+    proposed_improvements: dict[str, Any],
+    prompts: dict[str, str | list[dict[str, Any]]],
+    raw_lm_outputs: dict[str, str],
+) -> ProposalEndEvent:
+    """Build a :class:`ProposalEndEvent` with canonical and deprecated field names."""
+    return ProposalEndEvent(
+        iteration=iteration,
+        proposed_improvements=proposed_improvements,
+        new_instructions=proposed_improvements,
+        prompts=prompts,
+        raw_lm_outputs=raw_lm_outputs,
+    )
 
 
 class CandidateAcceptedEvent(TypedDict):

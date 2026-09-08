@@ -178,7 +178,7 @@ Inside `select_candidate_idx`, you have access to the full optimization state:
 
 | Field | Type | Description |
 |---|---|---|
-| `state.program_candidates` | `list[dict[str, str]]` | All candidates (index = program index) |
+| `state.program_candidates` | `list[dict[str, str]]` | All candidates (legacy name; index = candidate index) |
 | `state.program_full_acceptance_scores_val_set` | `list[float]` | Per-candidate acceptance score used for ranking |
 | `state.per_program_tracked_scores` | `list[float]` | Alias of `program_full_acceptance_scores_val_set` |
 | `state.prog_candidate_objective_scores` | `list[dict[str, float]]` | Per-objective scores per candidate |

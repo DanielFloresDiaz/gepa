@@ -34,7 +34,7 @@ from gepa.core.callbacks import (
     OptimizationEndEvent,
     OptimizationStartEvent,
     ParetoFrontUpdatedEvent,
-    ProposalEndEvent,
+    make_proposal_end_event,
     ProposalStartEvent,
     ReflectiveDatasetBuiltEvent,
     StateSavedEvent,
@@ -733,9 +733,9 @@ class TestReflectionEvents:
         notify_callbacks(
             [callback],
             "on_proposal_end",
-            ProposalEndEvent(
+            make_proposal_end_event(
                 iteration=3,
-                new_instructions={"instructions": "Improved instructions"},
+                proposed_improvements={"instructions": "Improved instructions"},
                 prompts={"instructions": "Reflect on this prompt..."},
                 raw_lm_outputs={"instructions": "```\nImproved instructions\n```"},
             ),
@@ -748,6 +748,7 @@ class TestReflectionEvents:
         assert start_calls[0]["parent_candidate"]["instructions"] == "Original instructions"
 
         assert len(end_calls) == 1
+        assert end_calls[0]["proposed_improvements"]["instructions"] == "Improved instructions"
         assert end_calls[0]["new_instructions"]["instructions"] == "Improved instructions"
         assert end_calls[0]["prompts"]["instructions"] == "Reflect on this prompt..."
         assert end_calls[0]["raw_lm_outputs"]["instructions"] == "```\nImproved instructions\n```"

@@ -3,11 +3,14 @@
 
 import os
 import random
+import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:
     from gepa.core.callbacks import GEPACallback
+
+_UNSET = object()
 
 from gepa.adapters.default_adapter.default_adapter import (
     ChatCompletionCallable,
@@ -58,9 +61,11 @@ def optimize(
     reflection_minibatch_size: int | None = None,
     perfect_score: float = 1.0,
     reflection_prompt_template: str | dict[str, str] | None = None,
+    custom_component_proposer: ProposalFn | None = _UNSET,
     custom_candidate_proposer: ProposalFn | None = None,
     # Component selection configuration
-    module_selector: ReflectionComponentSelector | str = "round_robin",
+    component_selector: ReflectionComponentSelector | str | object = _UNSET,
+    module_selector: ReflectionComponentSelector | str | object = _UNSET,
     # Merge-based configuration
     use_merge: bool = False,
     max_merge_invocations: int = 5,
@@ -122,11 +127,11 @@ def optimize(
        - Given the trajectories captured during the execution of the candidate, GEPA selects a component of the candidate to update.
        - The adapter receives the candidate, the batch of inputs, and the trajectories captured during the execution of the candidate.
        - The adapter is responsible for identifying the textual information relevant to the component to update.
-       - This information is used by GEPA to reflect on the performnace of the component, and propose new component texts.
+       - This information is used by GEPA to reflect on the performnace of the component, and propose component improvements.
 
-    At each iteration, GEPA proposes a new candidate using one of the following strategies:
-    1. Reflective mutation: GEPA proposes a new candidate by mutating the current candidate, leveraging rich textual feedback.
-    2. Merge: GEPA proposes a new candidate by merging 2 candidates that are on the Pareto frontier.
+    At each iteration, GEPA proposes a child candidate using one of the following strategies:
+    1. Reflective mutation: GEPA selects a parent candidate, proposes component improvements via reflection, and evaluates the resulting child candidate.
+    2. Merge: GEPA proposes a child candidate by merging 2 candidates that are on the Pareto frontier.
 
     GEPA also tracks the Pareto frontier of performance achieved by different candidates on the validation set. This way, it can leverage candidates that
     work well on a subset of inputs to improve the system's performance on the entire validation set, by evolving from the Pareto frontier.
@@ -148,10 +153,12 @@ def optimize(
     - reflection_minibatch_size: The number of examples to use for reflection in each proposal step. Defaults to 3. Only valid when batch_sampler='epoch_shuffled' (default), and is ignored otherwise.
     - perfect_score: The perfect score to achieve.
     - reflection_prompt_template: The prompt template to use for reflection. Can be either a string (applied to all components) or a dict mapping component names to their specific templates. If not provided, GEPA will use the default prompt template (see [InstructionProposalSignature](src/gepa/strategies/instruction_proposal.py)). Each prompt template must contain the following placeholders, which will be replaced with actual values: `<curr_param>` (will be replaced by the instructions/component to evolve) and `<side_info>` (replaced with the inputs, outputs, and feedback generated with current instruction). When using a dict, components without a specified template will use the default template. This will be ignored if the adapter provides its own `propose_improvements` method.
-    - custom_candidate_proposer: Optional custom function for proposing new candidates. If provided, this will be used instead of the default LLM-based reflection approach. Cannot be used if adapter provides `propose_improvements`. Signature: `(candidate, reflective_dataset, components_to_update) -> dict[str, str]`.
+    - custom_component_proposer: Optional custom function for proposing component improvements. If provided, this will be used instead of the default LLM-based reflection approach. Cannot be used if adapter provides `propose_improvements`. Signature: `(candidate, reflective_dataset, components_to_update) -> dict[str, str]`.
+    - custom_candidate_proposer: Deprecated alias for ``custom_component_proposer``.
 
     # Component selection configuration
-    - module_selector: Component selection strategy. Can be a ReflectionComponentSelector instance or a string ('round_robin', 'all'). Defaults to 'round_robin'. The 'round_robin' strategy cycles through components in order. The 'all' strategy selects all components for modification in every GEPA iteration.
+    - component_selector: Component selection strategy. Can be a ReflectionComponentSelector instance or a string ('round_robin', 'all'). Defaults to 'round_robin'. The 'round_robin' strategy cycles through components in order. The 'all' strategy selects all components for modification in every GEPA iteration.
+    - module_selector: Deprecated alias for ``component_selector``.
 
     # Merge-based configuration
     - use_merge: Whether to use the merge strategy.
@@ -189,7 +196,37 @@ def optimize(
     """
     # Validate seed_candidate is not None or empty
     if seed_candidate is None or not seed_candidate:
-        raise ValueError("seed_candidate must contain at least one component text.")
+        raise ValueError("seed_candidate must contain at least one component value.")
+
+    if custom_component_proposer is not _UNSET and custom_candidate_proposer is not None:
+        raise ValueError(
+            "Pass only one of custom_component_proposer or custom_candidate_proposer, not both."
+        )
+    if custom_component_proposer is not _UNSET:
+        resolved_custom_proposer = custom_component_proposer
+    elif custom_candidate_proposer is not None:
+        warnings.warn(
+            "custom_candidate_proposer is deprecated; use custom_component_proposer instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        resolved_custom_proposer = custom_candidate_proposer
+    else:
+        resolved_custom_proposer = None
+
+    if component_selector is not _UNSET and module_selector is not _UNSET:
+        raise ValueError("Pass only one of component_selector or module_selector, not both.")
+    if component_selector is not _UNSET:
+        resolved_module_selector = component_selector
+    elif module_selector is not _UNSET:
+        warnings.warn(
+            "module_selector is deprecated; use component_selector instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        resolved_module_selector = module_selector
+    else:
+        resolved_module_selector = "round_robin"
 
     active_adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None
     if adapter is None:
@@ -216,16 +253,16 @@ def optimize(
     adapter_has_propose = (
         hasattr(active_adapter, "propose_improvements") and active_adapter.propose_improvements is not None
     )
-    if adapter_has_propose and custom_candidate_proposer is not None:
+    if adapter_has_propose and resolved_custom_proposer is not None:
         raise ValueError(
-            "Cannot provide both adapter.propose_improvements and custom_candidate_proposer. "
+            "Cannot provide both adapter.propose_improvements and custom_component_proposer. "
             "Please use only one custom proposal method."
         )
 
-    if not adapter_has_propose and custom_candidate_proposer is None:
+    if not adapter_has_propose and resolved_custom_proposer is None:
         assert reflection_lm is not None, (
             f"reflection_lm was not provided. The adapter used '{active_adapter!s}' does not provide a propose_improvements method, "
-            + "and custom_candidate_proposer was not provided. "
+            + "and custom_component_proposer was not provided. "
             + "GEPA will use the default proposer, which requires a reflection_lm to be specified."
         )
 
@@ -317,19 +354,19 @@ def optimize(
             f"val_evaluation_policy should be one of 'full_eval' or an instance of EvaluationPolicy, but got {type(val_evaluation_policy)}"
         )
 
-    if isinstance(module_selector, str):
+    if isinstance(resolved_module_selector, str):
         module_selector_cls = {
             "round_robin": RoundRobinReflectionComponentSelector,
             "all": AllReflectionComponentSelector,
-        }.get(module_selector)
+        }.get(resolved_module_selector)
 
         assert module_selector_cls is not None, (
-            f"Unknown module_selector strategy: {module_selector}. Supported strategies: 'round_robin', 'all'"
+            f"Unknown component_selector strategy: {resolved_module_selector}. Supported strategies: 'round_robin', 'all'"
         )
 
         module_selector_instance: ReflectionComponentSelector = module_selector_cls()
     else:
-        module_selector_instance = module_selector
+        module_selector_instance = cast(ReflectionComponentSelector, resolved_module_selector)
 
     if batch_sampler == "epoch_shuffled":
         batch_sampler = EpochShuffledBatchSampler(minibatch_size=reflection_minibatch_size or 3, rng=rng)
@@ -393,7 +430,7 @@ def optimize(
         experiment_tracker=experiment_tracker,
         reflection_lm=reflection_lm_callable,
         reflection_prompt_template=reflection_prompt_template,
-        custom_candidate_proposer=custom_candidate_proposer,
+        custom_candidate_proposer=resolved_custom_proposer,
         callbacks=callbacks,
     )
 

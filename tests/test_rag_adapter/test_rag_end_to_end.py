@@ -426,7 +426,7 @@ def test_rag_end_to_end_optimization(sample_ai_ml_dataset, mock_chromadb_store):
         "best_idx": 0,  # Base program should be best with our deterministic setup
         # Exact scores depend on the mock LLM responses and evaluation logic
         # These values were captured from an actual test run
-        "expected_val_score": 0.6637837837837838,  # Exact score from deterministic run
+        "expected_raw_val_score": 0.6637837837837838,  # Exact raw metric score from deterministic run
         # The final prompt should match exactly - recorded from actual run
         "seed_prompt": SEED_PROMPT,
         "expected_final_prompt": SEED_PROMPT,  # No change in this deterministic case
@@ -441,9 +441,9 @@ def test_rag_end_to_end_optimization(sample_ai_ml_dataset, mock_chromadb_store):
     assert gepa_result.best_idx == EXPECTED_EXACT_RESULTS["best_idx"]
 
     # Assert exact score from recorded run
-    expected_val_score = EXPECTED_EXACT_RESULTS["expected_val_score"]
-    assert base_val_score == expected_val_score, (
-        f"Base validation score {base_val_score} != expected {expected_val_score}"
+    expected_raw_val_score = EXPECTED_EXACT_RESULTS["expected_raw_val_score"]
+    assert base_val_subscore == expected_raw_val_score, (
+        f"Base raw validation score {base_val_subscore} != expected {expected_raw_val_score}"
     )
 
     # 9. Assert exact final prompt (the key assertion requested in PR feedback)

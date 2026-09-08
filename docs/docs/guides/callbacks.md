@@ -84,7 +84,10 @@ GEPA fires 21 event types.  Each is a `TypedDict` — access fields with `event[
 |--------|------|-----------|
 | `on_reflective_dataset_built` | Reflective dataset assembled | `iteration`, `candidate_idx`, `components`, `dataset` |
 | `on_proposal_start` | Before calling the reflection LM | `iteration`, `parent_candidate`, `components`, `reflective_dataset` |
-| `on_proposal_end` | After the reflection LM responds | `iteration`, `new_instructions`, `prompts`, `raw_lm_outputs` |
+| `on_proposal_end` | After the reflection LM responds | `iteration`, `proposed_improvements`, `prompts`, `raw_lm_outputs` |
+
+!!! note "Deprecated callback field"
+    `new_instructions` on `on_proposal_end` is a deprecated alias for `proposed_improvements` and will be removed in a future release.
 
 ### Merge events
 
@@ -134,7 +137,7 @@ class LMCallLogger:
             if isinstance(prompt, str):
                 print("PROMPT (last 500 chars):", prompt[-500:])
             print("RAW OUTPUT:", event["raw_lm_outputs"].get(component, "")[:500])
-            print("EXTRACTED:", event["new_instructions"].get(component, "")[:200])
+            print("EXTRACTED:", event["proposed_improvements"].get(component, "")[:200])
 ```
 
 ### 3. Identify which LM call produced each accepted candidate
@@ -152,7 +155,7 @@ class ProposalTracker:
         self._pending[event["iteration"]] = {
             "prompts": event["prompts"],
             "raw_lm_outputs": event["raw_lm_outputs"],
-            "new_instructions": event["new_instructions"],
+            "proposed_improvements": event["proposed_improvements"],
         }
 
     def on_candidate_accepted(self, event):

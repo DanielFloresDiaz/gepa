@@ -85,14 +85,14 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput, CandidateT]):
 
     The following are the responsibilities of the adapter:
     1) Program construction and evaluation (evaluate):
-       Given a batch of DataInst and a "candidate" program (mapping from named components
-       -> component text), execute the program to produce per-example scores and
+       Given a batch of DataInst and a candidate (mapping from named components
+       -> component values), execute the program to produce per-example scores and
        optionally rich trajectories (capturing intermediate states) needed for reflection.
 
     2) Reflective dataset construction (make_reflective_dataset):
        Given the candidate, EvaluationBatch (trajectories, outputs, scores), and the list of components to update,
        produce a small JSON-serializable dataset for each component that you want to update. This
-       dataset is fed to the teacher LM to propose improved component text.
+       dataset is fed to the teacher LM to propose improved component values.
 
     3) Optional improvement proposal (propose_improvements):
        GEPA provides a default implementation (instruction_proposal.py) that serializes the reflective dataset
