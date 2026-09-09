@@ -58,6 +58,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          version: "0.11.2"
 
       - name: Check GITHUB_REF matches package version
         if: steps.tag_version.outputs.is_dev_tag != 'true'
