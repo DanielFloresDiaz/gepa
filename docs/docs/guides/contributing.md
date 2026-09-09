@@ -4,7 +4,7 @@ Thank you for your interest in contributing to GEPA! This guide will help you ge
 
 ## Environment Setup
 
-Python 3.10 or later is required.
+Python 3.13 or later is required.
 
 ### Setting Up with uv (Recommended)
 
@@ -17,7 +17,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Clone and setup
 git clone https://github.com/gepa-ai/gepa
 cd gepa
-uv sync --extra dev --python 3.11
+uv sync --extra dev --python 3.13
 
 # Verify installation
 uv run pytest tests/
@@ -29,7 +29,7 @@ uv run pytest tests/
 ### Setting Up with conda + pip
 
 ```bash
-conda create -n gepa-dev python=3.11
+conda create -n gepa-dev python=3.13
 conda activate gepa-dev
 pip install -e ".[dev]"
 

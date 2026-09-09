@@ -115,7 +115,7 @@ Before starting the tutorials, ensure you have:
    export OPENAI_API_KEY="your-key-here"
    ```
 
-2. **Python Environment**: Python 3.10+ with GEPA installed
+2. **Python Environment**: Python 3.13+ with GEPA installed
    ```bash
    pip install gepa[full]
    ```
