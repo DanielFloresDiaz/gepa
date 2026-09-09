@@ -92,7 +92,7 @@ Prefer **MINOR** over **MAJOR** for `0.x` unless the user asks for a major bump.
 
 ## Validation
 
-Validation checks the **branch being released** (typically `develop`), not only the release-artifact files you edited. A release is **not complete** until every check below passes. Do not defer failures as “pre-existing”, “unrelated to the changelog”, or “already on the branch” — fix them before finishing.
+Validation checks the **branch being released** (typically `develop`), not only the release-artifact files you edited. A release is **not complete** until every check below passes. Do not defer failures as "pre-existing", "unrelated to the changelog", or "already on the branch" — fix them before finishing.
 
 These mirror `.github/workflows/testing.yaml` (`lint`, `typecheck`, `test`). Respect an explicit user request to skip tests; otherwise run all of them.
 
@@ -111,7 +111,7 @@ make test
 2. If any command fails, fix the underlying code or config, then re-run the **full** sequence until green. Follow `.cursor/skills/python-refactoring/SKILL.md` while fixing Python/type issues and `.cursor/skills/python-testing/SKILL.md` after code fixes.
 3. Do not skip `make typecheck` or `make test` just because your edits were changelog, README, or version bumps — CI still runs them on push.
 4. Do not finish with a deliverable that lists failed validation; either fix failures or stop and report what is blocking release.
-5. If pre-commit’s format hook reformats files, stage those changes and run the full sequence again.
+5. If pre-commit's format hook reformats files, stage those changes and run the full sequence again.
 
 Only note skipped checks when the user explicitly asked to skip them.
 
