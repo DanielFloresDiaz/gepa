@@ -366,8 +366,7 @@ GEPA provides several ready-to-use adapters for common use cases:
 |---------|-------------|----------|
 | [DefaultAdapter](../api/adapters/DefaultAdapter.md) | Simple adapter for prompt optimization with any LLM | General prompt tuning, Q&A systems |
 | [ConfidenceAdapter](../api/adapters/ConfidenceAdapter.md) | Logprob-aware adapter for structured-output classification | Category classification, label prediction with enum outputs |
-| [DSPy Adapter](../api/adapters/DSPyAdapter.md) | Optimizes DSPy program instructions and prompts | DSPy module optimization |
-| [DSPy Full Program Adapter](../api/adapters/DSPyFullProgramAdapter.md) | Evolves entire DSPy programs including structure | Full program evolution, architecture search |
+| [dspy.GEPA](https://dspy.ai/tutorials/gepa_ai_program/) | Optimizes DSPy programs via the DSPy framework integration | DSPy module and full-program optimization |
 | [RAG Adapter](../api/adapters/RAGAdapter.md) | Optimizes RAG pipeline components | Retrieval-augmented generation systems |
 | [MCP Adapter](../api/adapters/MCPAdapter.md) | Optimizes MCP tool descriptions and system prompts | Tool-using agents, MCP servers |
 | [TerminalBench Adapter](../api/adapters/TerminalBenchAdapter.md) | Optimizes agents for terminal-based tasks | CLI agents, shell automation |
@@ -378,9 +377,7 @@ GEPA provides several ready-to-use adapters for common use cases:
 
 - **ConfidenceAdapter**: Use for **classification tasks** where the LLM returns a structured JSON output with `enum`-constrained fields (e.g. transaction categorization, sentiment analysis, intent classification). It extracts token-level logprobs via [`llm-structured-confidence`](https://github.com/rodolfonobrega/llm-structured-confidence) to penalise "lucky guesses" -- correct answers the model was uncertain about -- and feeds confidence details into the reflective feedback so GEPA can evolve prompts that resolve specific ambiguities between categories. Requires `pip install "gepa[confidence]"`.
 
-- **DSPy Adapter**: Use when you have a DSPy program and want to optimize the instructions for individual predictors while keeping the program structure fixed.
-
-- **DSPy Full Program Adapter**: Use when you want GEPA to evolve the entire DSPy program, including its structure and module composition.
+- **dspy.GEPA**: Use when optimizing [DSPy](https://dspy.ai/) programs. The in-repo DSPy adapters were removed in v0.2.0; use [`dspy.GEPA`](https://dspy.ai/tutorials/gepa_ai_program/) and the [DSPy Full Program Evolution tutorial](../tutorials/dspy_full_program_evolution.ipynb) instead.
 
 - **RAG Adapter**: Use for optimizing retrieval-augmented generation systems. Supports multiple vector stores (ChromaDB, Weaviate, Qdrant, Milvus, etc.) and optimizes query reformulation, context synthesis, and answer generation prompts.
 

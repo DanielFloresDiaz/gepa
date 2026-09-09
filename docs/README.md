@@ -25,7 +25,7 @@ The script auto-generates documentation for all items in `API_MAPPING`, includin
 - **Core**: optimize, GEPAAdapter, EvaluationBatch, GEPAResult, GEPACallback, DataLoader, GEPAState, EvaluationCache
 - **Callbacks**: All event types (OptimizationStartEvent, IterationEndEvent, etc.) and CompositeCallback
 - **Stop Conditions**: All stopper classes
-- **Adapters**: DefaultAdapter, DSPyAdapter, RAGAdapter, MCPAdapter, etc.
+- **Adapters**: DefaultAdapter, ConfidenceAdapter, RAGAdapter, MCPAdapter, etc.
 - **Proposers**: CandidateProposal, ReflectiveMutationProposer, MergeProposer, etc.
 - **Logging**: LoggerProtocol, StdOutLogger, Logger, ExperimentTracker, create_experiment_tracker
 - **Strategies**: BatchSampler, CandidateSelector, ComponentSelector, EvaluationPolicy variants
