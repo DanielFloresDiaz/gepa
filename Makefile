@@ -15,9 +15,9 @@ clean: ## Remove all build artifacts
 
 .PHONY: pre-commit
 pre-commit: .uv .pre-commit ## Run pre-commit hooks
-	uv sync --extra dev --group lint --quiet > /dev/null 2>&1
+	uv sync --frozen --extra dev --group lint --quiet > /dev/null 2>&1
 	pre-commit run --all-files
-	uv sync --extra dev --quiet > /dev/null 2>&1
+	uv sync --frozen --extra dev --quiet > /dev/null 2>&1
 
 .PHONY: install
 install: .uv .pre-commit ## Install the package, dependencies, and pre-commit for local development
@@ -30,31 +30,32 @@ sync: .uv ## Update local packages and uv.lock
 
 .PHONY: format
 format: ## Format the code
-	uv run ruff format
-	uv run ruff check --fix --fix-only
+	@# --no-sync avoids re-resolving uv.lock (CI uses uv sync --frozen before hooks)
+	uv run --no-sync ruff format
+	uv run --no-sync ruff check --fix --fix-only
 
 .PHONY: lint
 lint: ## Lint the code
-	uv run ruff format --check
-	uv run ruff check
+	uv run --no-sync ruff format --check
+	uv run --no-sync ruff check
 
 .PHONY: typecheck
 typecheck: ## Run static type checking
 	@# PYRIGHT_PYTHON_IGNORE_WARNINGS avoids the overhead of making a request to github on every invocation
-	uv sync --extra dev --group lint --quiet > /dev/null 2>&1
-	PYRIGHT_PYTHON_IGNORE_WARNINGS=1 uv run pyright
-	uv sync --extra dev --quiet > /dev/null 2>&1
+	uv sync --frozen --extra dev --group lint --quiet > /dev/null 2>&1
+	PYRIGHT_PYTHON_IGNORE_WARNINGS=1 uv run --no-sync pyright
+	uv sync --frozen --extra dev --quiet > /dev/null 2>&1
 
 .PHONY: test
 test: ## Run tests and collect coverage data
-	uv run coverage run -m pytest -vv tests/
+	uv run --no-sync coverage run -m pytest -vv tests/
 
 .PHONY: testcov
 testcov: test ## Run tests and generate a coverage report
 	@echo "building coverage html"
-	@uv run coverage report
-	@uv run coverage html --show-contexts --title "Coverage Report"
-	@uv run coverage xml
+	@uv run --no-sync coverage report
+	@uv run --no-sync coverage html --show-contexts --title "Coverage Report"
+	@uv run --no-sync coverage xml
 
 .PHONY: all
 all: format lint typecheck testcov ## Run code formatting, linting, static type checks, and tests with coverage report generation
