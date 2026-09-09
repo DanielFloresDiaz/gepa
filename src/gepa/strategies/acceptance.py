@@ -3,12 +3,11 @@
 
 from typing import Any, Protocol, runtime_checkable
 
-from gepa.core.data_loader import DataId
 from gepa.core.state import GEPAState
 from gepa.proposer.base import CandidateProposal
 
 
-def per_example_score_improvement(proposal: CandidateProposal[Any, Any]) -> dict[DataId, float]:
+def per_example_score_improvement(proposal: CandidateProposal[Any, Any]) -> dict[Any, float]:
     """Return per-example score deltas of ``proposal`` keyed by ``subsample_indices``.
 
     Empty score lists yield an empty dict.
@@ -19,7 +18,7 @@ def per_example_score_improvement(proposal: CandidateProposal[Any, Any]) -> dict
     }
 
 
-def mean_improvement(deltas: dict[DataId, float]) -> float:
+def mean_improvement(deltas: dict[Any, float]) -> float:
     """Return the mean of ``deltas``, or ``0.0`` when empty."""
     if not deltas:
         return 0.0
@@ -61,9 +60,7 @@ class AcceptanceCriterion(Protocol):
       validation scores, the Pareto frontier, iteration count, etc.
     """
 
-    def improvement(
-        self, proposal: CandidateProposal[Any, Any], state: GEPAState[Any, Any, Any]
-    ) -> dict[DataId, float]:
+    def improvement(self, proposal: CandidateProposal[Any, Any], state: GEPAState[Any, Any, Any]) -> dict[Any, float]:
         """Return per-example signed deltas of ``proposal`` vs its parent evaluation.
 
         Args:
@@ -98,9 +95,7 @@ class StrictImprovementAcceptance:
     This is the default acceptance criterion used by GEPA.
     """
 
-    def improvement(
-        self, proposal: CandidateProposal[Any, Any], state: GEPAState[Any, Any, Any]
-    ) -> dict[DataId, float]:
+    def improvement(self, proposal: CandidateProposal[Any, Any], state: GEPAState[Any, Any, Any]) -> dict[Any, float]:
         return per_example_score_improvement(proposal)
 
     def should_accept(self, proposal: CandidateProposal[Any, Any], state: GEPAState[Any, Any, Any]) -> bool:
@@ -114,9 +109,7 @@ class ImprovementOrEqualAcceptance:
     may explore different regions of the solution space.
     """
 
-    def improvement(
-        self, proposal: CandidateProposal[Any, Any], state: GEPAState[Any, Any, Any]
-    ) -> dict[DataId, float]:
+    def improvement(self, proposal: CandidateProposal[Any, Any], state: GEPAState[Any, Any, Any]) -> dict[Any, float]:
         return per_example_score_improvement(proposal)
 
     def should_accept(self, proposal: CandidateProposal[Any, Any], state: GEPAState[Any, Any, Any]) -> bool:

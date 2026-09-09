@@ -10,7 +10,12 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 if TYPE_CHECKING:
     from gepa.core.callbacks import GEPACallback
 
-_UNSET = object()
+
+class _UnsetType:
+    """Sentinel for optional parameters that distinguish unset from explicit values."""
+
+
+_UNSET = _UnsetType()
 
 from gepa.adapters.default_adapter.default_adapter import (
     ChatCompletionCallable,
@@ -61,11 +66,11 @@ def optimize(
     reflection_minibatch_size: int | None = None,
     perfect_score: float = 1.0,
     reflection_prompt_template: str | dict[str, str] | None = None,
-    custom_component_proposer: ProposalFn | None = _UNSET,
+    custom_component_proposer: ProposalFn | None | _UnsetType = _UNSET,
     custom_candidate_proposer: ProposalFn | None = None,
     # Component selection configuration
-    component_selector: ReflectionComponentSelector | str | object = _UNSET,
-    module_selector: ReflectionComponentSelector | str | object = _UNSET,
+    component_selector: ReflectionComponentSelector | str | _UnsetType = _UNSET,
+    module_selector: ReflectionComponentSelector | str | _UnsetType = _UNSET,
     # Merge-based configuration
     use_merge: bool = False,
     max_merge_invocations: int = 5,
@@ -200,29 +205,32 @@ def optimize(
 
     if custom_component_proposer is not _UNSET and custom_candidate_proposer is not None:
         raise ValueError("Pass only one of custom_component_proposer or custom_candidate_proposer, not both.")
-    if custom_component_proposer is not _UNSET:
-        resolved_custom_proposer = custom_component_proposer
-    elif custom_candidate_proposer is not None:
-        warnings.warn(
-            "custom_candidate_proposer is deprecated; use custom_component_proposer instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        resolved_custom_proposer = custom_candidate_proposer
+    resolved_custom_proposer: ProposalFn | None
+    if custom_component_proposer is _UNSET:
+        if custom_candidate_proposer is not None:
+            warnings.warn(
+                "custom_candidate_proposer is deprecated; use custom_component_proposer instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            resolved_custom_proposer = custom_candidate_proposer
+        else:
+            resolved_custom_proposer = None
     else:
-        resolved_custom_proposer = None
+        resolved_custom_proposer = cast(ProposalFn | None, custom_component_proposer)
 
     if component_selector is not _UNSET and module_selector is not _UNSET:
         raise ValueError("Pass only one of component_selector or module_selector, not both.")
+    resolved_module_selector: ReflectionComponentSelector | str
     if component_selector is not _UNSET:
-        resolved_module_selector = component_selector
+        resolved_module_selector = cast(ReflectionComponentSelector | str, component_selector)
     elif module_selector is not _UNSET:
         warnings.warn(
             "module_selector is deprecated; use component_selector instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        resolved_module_selector = module_selector
+        resolved_module_selector = cast(ReflectionComponentSelector | str, module_selector)
     else:
         resolved_module_selector = "round_robin"
 
