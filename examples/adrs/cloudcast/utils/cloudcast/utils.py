@@ -22,7 +22,7 @@ GBIT_PER_GBYTE = 8
 
 class Timer:
     """Context manager for timing code blocks."""
-    
+
     def __init__(self, print_desc=None):
         self.print_desc = print_desc
         self.start = time.time()
@@ -46,30 +46,30 @@ class Timer:
 def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
     """
     Create a networkx graph with capacity constraints and cost info.
-    
+
     nodes: regions
     edges: links with the following attributes:
         throughput: max throughput achievable (gbps)
         cost: $/GB
         flow: actual flow (gbps), must be < throughput, default = 0
-        
+
     Args:
         cost_path: Path to cost CSV file (default: profiles/cost.csv)
         throughput_path: Path to throughput CSV file (default: profiles/throughput.csv)
         num_vms: Number of VMs per region (scales throughput)
-        
+
     Returns:
         networkx.DiGraph with edges containing cost and throughput data
     """
     # Get paths relative to this file's location
     utils_dir = os.path.dirname(os.path.abspath(__file__))
-    
+
     if cost_path is None:
         cost_path = os.path.join(utils_dir, "profiles/cost.csv")
-    
+
     if throughput_path is None:
         throughput_path = os.path.join(utils_dir, "profiles/throughput.csv")
-    
+
     cost = pd.read_csv(cost_path)
     throughput = pd.read_csv(throughput_path)
 
@@ -78,9 +78,9 @@ def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
         if row["src_region"] == row["dst_region"]:
             continue
         G.add_edge(
-            row["src_region"], 
-            row["dst_region"], 
-            cost=None, 
+            row["src_region"],
+            row["dst_region"],
+            cost=None,
             throughput=num_vms * row["throughput_sent"] / 1e9
         )
 
@@ -94,7 +94,7 @@ def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
         src, dst = edge[0], edge[1]
         if edge[-1]["cost"] is None:
             no_cost_pairs.append((src, dst))
-    
+
     if no_cost_pairs:
         print("Unable to get costs for: ", no_cost_pairs)
 
@@ -137,7 +137,7 @@ def networkx_to_graphviz(g, src, dsts, label="partitions"):
     """
     if not HAS_GRAPHVIZ:
         raise ImportError("graphviz is required for visualization. Install with: pip install graphviz")
-    
+
     if g.is_directed():
         h = gv.Digraph()
     else:

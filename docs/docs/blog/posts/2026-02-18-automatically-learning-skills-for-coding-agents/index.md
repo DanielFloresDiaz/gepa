@@ -78,7 +78,7 @@ To start with, we tested a proof-of-concept implementation of gskill on a simple
 
 Under 300 rollouts, the Mini-SWE-Agent with GEPA-evolved skills achieves a resolve rate of 82% on Jinja and 93% on Bleve, compared to the baseline of 55% and 24% respectively. While the results are promising, Mini-SWE-Agent is a relatively simple agent, and we are curious to learn if the learned skills are transferable to a production-ready agent.
 
-### Transfer to Claude Code 
+### Transfer to Claude Code
 
 To measure whether the learned skills are beneficial for other agents as well, we perform the experiments on the same set of tasks, but with Claude Code. We installed Claude Code into the task environment, and evaluated the performance with and without the learned skills (as a `.claude/skills/{repo_name}/SKILL.md` file). Here are the results:
 
@@ -104,7 +104,7 @@ Here, we showcase some of the learned skills for the Bleve repository.
   - package: `go test ./path/to/pkg`
   - single test: `go test ./path/to/pkg -run TestName -count=1` (add -v only if needed)
 - For panics: follow the stack trace top frame in repo code first.
-- For mismatches: use “expected vs got” to locate the producing function and invariants.
+- For mismatches: use "expected vs got" to locate the producing function and invariants.
 
 ...
 

@@ -23,17 +23,16 @@ import pytest
 
 pytest.importorskip("llm_structured_confidence", reason="requires gepa[confidence] extra")
 
-from gepa.adapters.confidence_adapter.confidence_adapter import (  # noqa: E402
+from gepa.adapters.confidence_adapter.confidence_adapter import (
     ConfidenceAdapter,
     ConfidenceDataInst,
     _build_feedback,
     _extract_answer_from_json,
 )
-from gepa.adapters.confidence_adapter.scoring import (  # noqa: E402
+from gepa.adapters.confidence_adapter.scoring import (
     LinearBlendScoring,
     ThresholdScoring,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers for building mock LLM responses

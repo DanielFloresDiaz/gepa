@@ -29,7 +29,7 @@ from colorama import init, Fore, Style
 init(autoreset=True)
 
 from sky_spot import env as env_lib
-from sky_spot.env import MultiTraceEnv, TraceEnv 
+from sky_spot.env import MultiTraceEnv, TraceEnv
 from sky_spot import simulate
 from sky_spot.strategies import strategy as strategy_lib
 from sky_spot.task import SingleTask, ChainedTask, Task
@@ -37,7 +37,7 @@ from sky_spot.task import SingleTask, ChainedTask, Task
 if os.environ.get('ENABLE_WANDB', '0') == '1':
     wandb.init(project='sky-spot')
 logger = logging.getLogger(__name__)
-    
+
 def load_strategy_from_file(file_path: str) -> Type[strategy_lib.Strategy]:
     """Dynamically loads a strategy class from a Python file."""
     try:
@@ -45,7 +45,7 @@ def load_strategy_from_file(file_path: str) -> Type[strategy_lib.Strategy]:
         spec = importlib.util.spec_from_file_location(module_name, file_path)
         if spec is None or spec.loader is None:
             raise ImportError(f"Could not load spec for module from {file_path}")
-        
+
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
@@ -58,7 +58,7 @@ def load_strategy_from_file(file_path: str) -> Type[strategy_lib.Strategy]:
                 if obj.__name__ not in ['Strategy', 'MultiRegionStrategy']:
                     found_classes.append(obj)
                     logger.info(f"Found strategy class '{obj.__name__}' in {file_path}")
-        
+
         if found_classes:
             # Return the first non-base strategy class found
             return found_classes[0]
@@ -92,13 +92,13 @@ if __name__ == '__main__':
     def setup_logger():
         logging_level = os.environ.get('LOG_LEVEL', 'DEBUG')
         handler = logging.StreamHandler(sys.stdout)
-        
+
         class SimpleColorFormatter(logging.Formatter):
             def format(self, record):
                 # Get the last part of the module name
                 name_parts = record.name.split('.')
                 short_name = name_parts[-1] if name_parts else record.name
-                
+
                 # Apply colors based on level
                 if record.levelname == 'ERROR':
                     color = Fore.RED
@@ -108,9 +108,9 @@ if __name__ == '__main__':
                     color = Fore.LIGHTBLACK_EX  # Gray
                 else:
                     color = ''  # No color for INFO
-                
+
                 return f"{color}[{short_name}] {record.getMessage()}{Style.RESET_ALL}"
-        
+
         handler.setFormatter(SimpleColorFormatter())
         handler.setLevel(logging_level)
         root_logger.setLevel(logging_level)
@@ -164,7 +164,7 @@ if __name__ == '__main__':
                        type=str,
                        default='exp/',
                        help='Output directory')
-    
+
     # --- MODIFIED PART: Define strategy args at the top level ---
     strategy_group = parser.add_argument_group('Strategy Selection')
     strategy_group.add_argument('--strategy-file',
@@ -229,7 +229,7 @@ if __name__ == '__main__':
             )
             num_sub_tasks = len(sub_task_env_configs)
             assert num_sub_tasks > 0, "'sub_task_envs' list cannot be empty."
-            
+
             subtask_indexed_files: list[dict[int, list[str]]] = []
             common_indices = None
             logger.info(
@@ -239,28 +239,28 @@ if __name__ == '__main__':
                 trace_paths = sub_cfg.get('trace_files', [])
                 if not trace_paths:
                      raise ValueError(f"Sub-task env config {i} must contain 'trace_files'.")
-                
-                indexed_files_per_region = [] 
+
+                indexed_files_per_region = []
                 for path in trace_paths:
                      indexed_files_in_path = find_indexed_traces(path)
                      indexed_files_per_region.append(indexed_files_in_path)
-                
+
                 current_subtask_indices = set(indexed_files_per_region[0].keys()) if indexed_files_per_region else set()
                 for region_files in indexed_files_per_region[1:]:
                     current_subtask_indices.intersection_update(region_files.keys())
-                    
+
                 if not current_subtask_indices:
                      raise ValueError(f"No common trace indices found across regions for sub-task {i}. Check paths: {trace_paths}")
-                
+
                 aligned_files_for_subtask = defaultdict(list)
                 for idx in sorted(list(current_subtask_indices)):
                     for region_files in indexed_files_per_region:
                         if idx in region_files:
                              aligned_files_for_subtask[idx].append(region_files[idx])
-                        else: 
+                        else:
                              raise RuntimeError(f"Logic error: Index {idx} not found in region files after intersection.")
                 subtask_indexed_files.append(aligned_files_for_subtask)
-                
+
                 if common_indices is None:
                     common_indices = current_subtask_indices
                 else:
@@ -268,14 +268,14 @@ if __name__ == '__main__':
 
             if common_indices is None or not common_indices:
                 raise ValueError("No common trace indices found across *all* sub-tasks.")
-                
+
             num_runs = len(common_indices)
             print(f"--> Found {num_runs} matching trace file sets across all sub-tasks.")
             print(f"--> Creating {num_runs} simulation environment instance(s)...")
-            
+
             from sky_spot.env import SubtaskMultiEnvSwitcher # Import here
             final_common_indices = sorted(list(common_indices))
-            
+
             for i in range(num_runs):
                 run_idx = final_common_indices[i]
                 sub_envs_for_this_run = []
@@ -285,10 +285,10 @@ if __name__ == '__main__':
                      env_start_hours = sub_cfg.get('env_start_hours', default_env_start_hours)
                      sub_env = MultiTraceEnv(trace_files=files_for_subtask_run, env_start_hours=env_start_hours)
                      sub_envs_for_this_run.append(sub_env)
-                     
+
                 switcher = SubtaskMultiEnvSwitcher(sub_environments=sub_envs_for_this_run)
-                envs.append(switcher) 
-            
+                envs.append(switcher)
+
             print(f"--> Finished creating {len(envs)} environment instance(s).")
             trace_param = f"subtask_switcher_{num_sub_tasks}subs_{num_runs}runs"
         elif env_type_name == 'multi_trace':
@@ -305,7 +305,7 @@ if __name__ == '__main__':
             trace_param = os.path.basename(env_trace_files[0])
         else:
             raise ValueError(f"Unknown env type in scenario: {env_type_name}")
-        
+
         assert envs, f"Failed to create environment(s) for scenario '{scenario_name}'."
         logger.info(f"Environment(s) created: {envs}")
 
@@ -342,7 +342,7 @@ if __name__ == '__main__':
         else:
             logger.info(f"Loading built-in strategy: {args.strategy}")
             StrategyClass = strategy_lib.Strategy.get(args.strategy)
-        
+
         strategy = StrategyClass._from_args(parser)
         args = strategy.args
         logger.info(f"Strategy: {strategy.name}")
@@ -350,14 +350,14 @@ if __name__ == '__main__':
     else:
         # This logic block is for when you run with CLI arguments directly.
         envs = env_lib.Env.from_args(parser)
-        
+
         if args.strategy_file:
             logger.info(f"Dynamically loading strategy from: {args.strategy_file}")
             StrategyClass = load_strategy_from_file(args.strategy_file)
         else:
             logger.info(f"Loading built-in strategy: {args.strategy}")
             StrategyClass = strategy_lib.Strategy.get(args.strategy)
-        
+
         strategy = StrategyClass._from_args(parser)
         args = strategy.args
 

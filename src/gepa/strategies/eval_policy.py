@@ -30,7 +30,12 @@ class EvaluationPolicy(Protocol[DataId, DataInst]):  # type: ignore
 
     @abstractmethod
     def get_valset_score(self, program_idx: ProgramIdx, state: GEPAState[Any, Any, Any]) -> float:
-        """Return the score of the program on the valset"""
+        """Return the program's ranking score on the valset.
+
+        The default :class:`FullEvaluationPolicy` returns the 1-centered
+        acceptance score. Custom policies may return another aggregate
+        (for example the mean of raw scores on the evaluated subset).
+        """
         ...
 
 
@@ -47,20 +52,19 @@ class FullEvaluationPolicy(EvaluationPolicy[DataId, DataInst]):
         return list(loader.all_ids())
 
     def get_best_program(self, state: GEPAState[Any, Any, Any]) -> ProgramIdx:
-        """Pick the program whose evaluated validation scores achieve the highest average."""
+        """Pick the program with the highest acceptance score (coverage as tie-break)."""
         best_idx, best_score, best_coverage = -1, float("-inf"), -1
-        for program_idx, scores in enumerate(state.prog_candidate_val_subscores):
-            coverage = len(scores)
-            avg = sum(scores.values()) / coverage if coverage else float("-inf")
-            if avg > best_score or (avg == best_score and coverage > best_coverage):
-                best_score = avg
+        for program_idx, acc_score in enumerate(state.prog_candidate_acceptance_scores):
+            coverage = len(state.prog_candidate_per_example_scores[program_idx])
+            if acc_score > best_score or (acc_score == best_score and coverage > best_coverage):
+                best_score = acc_score
                 best_idx = program_idx
                 best_coverage = coverage
         return best_idx
 
     def get_valset_score(self, program_idx: ProgramIdx, state: GEPAState[Any, Any, Any]) -> float:
-        """Return the score of the program on the valset"""
-        return state.get_program_average_val_subset(program_idx)[0]
+        """Return the 1-centered acceptance score of the program (seed is 1.0)."""
+        return state.prog_candidate_acceptance_scores[program_idx]
 
 
 __all__ = [

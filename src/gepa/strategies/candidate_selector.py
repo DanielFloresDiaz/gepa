@@ -16,7 +16,7 @@ class ParetoCandidateSelector(CandidateSelector):
             self.rng = rng
 
     def select_candidate_idx(self, state: GEPAState) -> int:
-        assert len(state.program_full_scores_val_set) == len(state.program_candidates)
+        assert len(state.program_full_acceptance_scores_val_set) == len(state.program_candidates)
         return select_program_candidate_from_pareto_front(
             state.get_pareto_front_mapping(),
             state.per_program_tracked_scores,
@@ -29,8 +29,8 @@ class CurrentBestCandidateSelector(CandidateSelector):
         pass
 
     def select_candidate_idx(self, state: GEPAState) -> int:
-        assert len(state.program_full_scores_val_set) == len(state.program_candidates)
-        return idxmax(state.program_full_scores_val_set)
+        assert len(state.program_full_acceptance_scores_val_set) == len(state.program_candidates)
+        return idxmax(state.program_full_acceptance_scores_val_set)
 
 
 class EpsilonGreedyCandidateSelector(CandidateSelector):
@@ -43,15 +43,15 @@ class EpsilonGreedyCandidateSelector(CandidateSelector):
             self.rng = rng
 
     def select_candidate_idx(self, state: GEPAState) -> int:
-        assert len(state.program_full_scores_val_set) == len(state.program_candidates)
+        assert len(state.program_full_acceptance_scores_val_set) == len(state.program_candidates)
         if self.rng.random() < self.epsilon:
             return self.rng.randint(0, len(state.program_candidates) - 1)
         else:
-            return idxmax(state.program_full_scores_val_set)
+            return idxmax(state.program_full_acceptance_scores_val_set)
 
 
 class TopKParetoCandidateSelector(CandidateSelector):
-    """Pareto selection restricted to the top K programs by aggregate score."""
+    """Pareto selection restricted to the top K programs by acceptance score."""
 
     def __init__(self, k: int, rng: random.Random | None):
         assert k > 0
@@ -62,8 +62,8 @@ class TopKParetoCandidateSelector(CandidateSelector):
             self.rng = rng
 
     def select_candidate_idx(self, state: GEPAState) -> int:
-        assert len(state.program_full_scores_val_set) == len(state.program_candidates)
-        # Get top K program indices by aggregate score
+        assert len(state.program_full_acceptance_scores_val_set) == len(state.program_candidates)
+        # Get top K program indices by acceptance score
         scores = state.per_program_tracked_scores
         top_k_indices = set(sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[: self.k])
 

@@ -203,39 +203,39 @@ def sample_prompts():
     return {
         "query_reformulation": """
         You are an expert at reformulating queries for better information retrieval.
-        
+
         Original query: {query}
-        
+
         Please reformulate this query to be more specific and likely to retrieve relevant documents:
         """.strip(),
         "context_synthesis": """
         You are an expert at synthesizing information from multiple documents.
-        
+
         Query: {query}
-        
+
         Documents:
         {documents}
-        
+
         Please synthesize these documents into a coherent context that addresses the query:
         """.strip(),
         "answer_generation": """
         You are a helpful AI assistant providing accurate answers based on given context.
-        
+
         Question: {query}
-        
+
         Context:
         {context}
-        
+
         Please provide a comprehensive and accurate answer to the question using the provided context:
         """.strip(),
         "reranking_criteria": """
         You are an expert at ranking documents by relevance to a specific query.
-        
+
         Query: {query}
-        
+
         Documents to rank:
         {documents}
-        
+
         Please rank these documents from most relevant to least relevant for answering the query:
         """.strip(),
     }

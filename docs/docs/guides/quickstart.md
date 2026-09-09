@@ -57,7 +57,7 @@ result = gepa.optimize(
 
 # Get the optimized prompt and best score
 print("Best prompt:", result.best_candidate['system_prompt'])
-print("Best score:", result.val_aggregate_scores[result.best_idx])
+print("Best score:", result.val_acceptance_scores[result.best_idx])
 ```
 
 ### Option 2: Using optimize_anything
@@ -113,7 +113,7 @@ dspy.configure(lm=lm)
 class QAProgram(dspy.Module):
     def __init__(self):
         self.generate = dspy.ChainOfThought("question -> answer")
-    
+
     def forward(self, question):
         return self.generate(question=question)
 
@@ -121,7 +121,7 @@ class QAProgram(dspy.Module):
 def metric_with_feedback(example, pred, trace=None):
     correct = example.answer.lower() in pred.answer.lower()
     score = 1.0 if correct else 0.0
-    
+
     # Provide textual feedback to guide GEPA's reflection
     if correct:
         feedback = f"Correct! The answer '{pred.answer}' matches the expected answer '{example.answer}'."
@@ -130,7 +130,7 @@ def metric_with_feedback(example, pred, trace=None):
             f"Incorrect. Expected '{example.answer}' but got '{pred.answer}'. "
             f"Think about how to reason more carefully to arrive at the correct answer."
         )
-    
+
     return dspy.Prediction(score=score, feedback=feedback)
 
 # Prepare data (aim for 30-300 examples for best results)
@@ -157,7 +157,7 @@ print(optimized_program.generate.signature.instructions)
 
 !!! tip "Feedback is Key"
     GEPA's strength lies in leveraging textual feedback. The more informative your feedback, the better GEPA can reflect and propose improvements. Include details like:
-    
+
     - What went wrong and what was expected
     - Hints for improvement
     - Reference solutions (if available)
@@ -172,8 +172,10 @@ The `GEPAResult` object contains:
 ```python
 result.best_candidate                          # the optimized text components (or str when seed was a str)
 result.best_idx                                # int — index of the best candidate
-result.val_aggregate_scores                    # list[float] — per-candidate average validation score
-result.val_aggregate_scores[result.best_idx]   # float — best score
+result.val_acceptance_scores                    # list[float] — per-candidate acceptance ranking score (seed is 1.0)
+result.val_acceptance_scores[result.best_idx]   # float — best acceptance score
+result.val_per_example_scores                   # list[dict] — raw per-example metric scores
+result.val_per_example_acceptance_scores        # list[dict] — per-example acceptance scores
 result.candidates                              # list of all explored candidates
 result.per_val_instance_best_candidates        # dict mapping val_id -> set of candidates on the Pareto frontier
 result.total_metric_calls                      # int — total evaluation calls used

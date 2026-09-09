@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280">
   <!-- Background: Sky and distant scenery -->
   <rect width="1280" height="1280" fill="#bbdefb"/>
-  
+
   <!-- Stylized Sun -->
   <circle cx="1100" cy="180" r="80" fill="#fff9c4" opacity="0.8"/>
-  
+
   <!-- Stylized Mountains/Hills for depth -->
   <path d="M0 900 L300 700 L600 850 L900 650 L1280 900 Z" fill="#90caf9" opacity="0.5"/>
-  
+
   <!-- Road and Ground -->
   <rect x="0" y="900" width="1280" height="380" fill="#455a64"/>
   <rect x="0" y="900" width="1280" height="30" fill="#37474f"/>
@@ -65,19 +65,19 @@
   <!-- Pelican (The Rider) -->
   <!-- Far Leg (hidden/subtle) -->
   <path d="M560 600 L660 880 L690 950" fill="none" stroke="#ef6c00" stroke-width="12" stroke-linecap="round" opacity="0.4"/>
-  
+
   <!-- Pelican Body -->
   <ellipse cx="560" cy="480" rx="220" ry="140" fill="white" stroke="#eceff1" stroke-width="2"/>
-  
+
   <!-- Neck and Head -->
   <path d="M730 460 Q850 460 830 250" fill="none" stroke="white" stroke-width="75" stroke-linecap="round"/>
   <circle cx="830" cy="250" r="60" fill="white"/>
   <circle cx="855" cy="230" r="8" fill="#212121"/>
-  
+
   <!-- Beak (Characteristic pouch) -->
   <path d="M865 220 L1150 270 Q1100 500 865 380 Z" fill="#ffa726"/>
   <path d="M865 220 L1130 275" fill="none" stroke="#f57c00" stroke-width="5"/>
-  
+
   <!-- Wing (Arm reaching for handlebars) -->
   <path d="M620 480 Q760 480 830 580" fill="none" stroke="white" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
 

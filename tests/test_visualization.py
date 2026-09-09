@@ -97,6 +97,7 @@ class TestCandidateTreeHtml:
         html = candidate_tree_html_from_data(candidates, parents, val_scores, pareto_front)
         assert 'id="tooltip"' in html
         assert "showTooltip" in html
+        assert "Acceptance score:" in html
 
 
 class TestGEPAResultVisualization:
@@ -108,8 +109,9 @@ class TestGEPAResultVisualization:
         result = GEPAResult(
             candidates=candidates,
             parents=parents,
-            val_aggregate_scores=val_scores,
-            val_subscores=[{} for _ in candidates],
+            val_acceptance_scores=val_scores,
+            val_per_example_scores=[{} for _ in candidates],
+            val_per_example_acceptance_scores=[{} for _ in candidates],
             per_val_instance_best_candidates=pareto_front,
             discovery_eval_counts=[0, 5, 5],
         )
@@ -125,8 +127,9 @@ class TestGEPAResultVisualization:
         result = GEPAResult(
             candidates=candidates,
             parents=parents,
-            val_aggregate_scores=val_scores,
-            val_subscores=[{} for _ in candidates],
+            val_acceptance_scores=val_scores,
+            val_per_example_scores=[{} for _ in candidates],
+            val_per_example_acceptance_scores=[{} for _ in candidates],
             per_val_instance_best_candidates=pareto_front,
             discovery_eval_counts=[0, 5, 5],
         )

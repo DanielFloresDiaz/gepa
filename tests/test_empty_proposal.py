@@ -60,12 +60,12 @@ def test_empty_proposal_skips_child_evaluation():
         reflection_lm=None,
     )
 
-    curr_prog = {"comp": "seed"}
+    curr_candidate = {"comp": "seed"}
     ctx = ProposalContext(
         iteration=1,
-        curr_prog_id=0,
-        curr_prog=curr_prog,
-        curr_prog_score=0.5,
+        curr_candidate_idx=0,
+        curr_candidate=curr_candidate,
+        curr_candidate_score=0.5,
         subsample_ids=[0],
         minibatch=["ex0"],
         parent_ids=[0],

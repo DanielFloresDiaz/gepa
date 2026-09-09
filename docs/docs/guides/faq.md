@@ -188,7 +188,7 @@ This provides a **large boost in rollout efficiency**. By default, GEPA updates 
 
 ### Can GEPA optimize entire agent architectures?
 
-Yes! GEPA can evolve not just prompts but the **whole agent architecture**—including task decomposition, control flow, and module structure. 
+Yes! GEPA can evolve not just prompts but the **whole agent architecture**—including task decomposition, control flow, and module structure.
 
 Example: Starting from a simple `dspy.ChainOfThought('question -> answer')`, GEPA evolved a multi-step reasoning program, improving GPT-4.1 Nano's accuracy on MATH from **67% to 93%** in just 4 iterations.
 
@@ -539,7 +539,7 @@ dspy.Example(question="Is this email urgent?", answer="Yes").with_inputs("questi
 
 # Augmented example (recommended)
 dspy.Example(
-    question="Is this email urgent?", 
+    question="Is this email urgent?",
     answer="Yes",
     explanation="The email mentions a deadline of 'end of day today' and uses words like 'critical' and 'ASAP', indicating urgency."
 ).with_inputs("question")

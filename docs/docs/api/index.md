@@ -76,8 +76,7 @@ Stop conditions control when optimization terminates.
 Adapters integrate GEPA with different systems and frameworks.
 
 - [`DefaultAdapter`](adapters/DefaultAdapter.md)
-- [`DSPyAdapter`](adapters/DSPyAdapter.md)
-- [`DSPyFullProgramAdapter`](adapters/DSPyFullProgramAdapter.md)
+- [`ConfidenceAdapter`](adapters/ConfidenceAdapter.md)
 - [`RAGAdapter`](adapters/RAGAdapter.md)
 - [`MCPAdapter`](adapters/MCPAdapter.md)
 - [`TerminalBenchAdapter`](adapters/TerminalBenchAdapter.md)
@@ -119,4 +118,3 @@ Strategies for various aspects of the optimization process.
 - [`EvaluationPolicy`](strategies/EvaluationPolicy.md)
 - [`FullEvaluationPolicy`](strategies/FullEvaluationPolicy.md)
 - [`InstructionProposalSignature`](strategies/InstructionProposalSignature.md)
-

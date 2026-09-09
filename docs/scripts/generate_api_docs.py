@@ -77,8 +77,7 @@ API_MAPPING = {
     ],
     "adapters": [
         ("gepa.adapters.default_adapter.default_adapter", "DefaultAdapter", "DefaultAdapter"),
-        ("gepa.adapters.dspy_adapter.dspy_adapter", "DspyAdapter", "DSPyAdapter"),
-        ("gepa.adapters.dspy_full_program_adapter.full_program_adapter", "DspyAdapter", "DSPyFullProgramAdapter"),
+        ("gepa.adapters.confidence_adapter.confidence_adapter", "ConfidenceAdapter", "ConfidenceAdapter"),
         ("gepa.adapters.generic_rag_adapter.generic_rag_adapter", "GenericRAGAdapter", "RAGAdapter"),
         ("gepa.adapters.mcp_adapter.mcp_adapter", "MCPAdapter", "MCPAdapter"),
         ("gepa.adapters.terminal_bench_adapter.terminal_bench_adapter", "TerminusAdapter", "TerminalBenchAdapter"),

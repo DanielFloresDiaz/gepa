@@ -76,7 +76,7 @@ GEPA fires 21 event types.  Each is a `TypedDict` — access fields with `event[
 | `on_evaluation_start` | Before adapter.evaluate() | `iteration`, `candidate_idx`, `batch_size`, `capture_traces`, `inputs`, `is_seed_candidate` |
 | `on_evaluation_end` | After adapter.evaluate() | `iteration`, `candidate_idx`, `scores`, `outputs`, `trajectories`, `objective_scores`, `is_seed_candidate` |
 | `on_evaluation_skipped` | Evaluation skipped (no trajectories / perfect score) | `iteration`, `candidate_idx`, `reason`, `scores` |
-| `on_valset_evaluated` | After a candidate is scored on the full validation set | `iteration`, `candidate_idx`, `candidate`, `scores_by_val_id`, `average_score`, `is_best_program`, `outputs_by_val_id` |
+| `on_valset_evaluated` | After a candidate is scored on the full validation set | `iteration`, `candidate_idx`, `candidate`, `scores_by_val_id` (raw per-example metrics), `average_score` (policy valset score; acceptance under the default policy), `acceptance_score`, `raw_aggregate`, `is_best_program`, `outputs_by_val_id` |
 
 ### Reflection events
 
@@ -84,7 +84,10 @@ GEPA fires 21 event types.  Each is a `TypedDict` — access fields with `event[
 |--------|------|-----------|
 | `on_reflective_dataset_built` | Reflective dataset assembled | `iteration`, `candidate_idx`, `components`, `dataset` |
 | `on_proposal_start` | Before calling the reflection LM | `iteration`, `parent_candidate`, `components`, `reflective_dataset` |
-| `on_proposal_end` | After the reflection LM responds | `iteration`, `new_instructions`, `prompts`, `raw_lm_outputs` |
+| `on_proposal_end` | After the reflection LM responds | `iteration`, `proposed_improvements`, `prompts`, `raw_lm_outputs` |
+
+!!! note "Deprecated callback field"
+    `new_instructions` on `on_proposal_end` is a deprecated alias for `proposed_improvements` and will be removed in a future release.
 
 ### Merge events
 
@@ -116,6 +119,7 @@ class ProgressCallback:
 
     def on_valset_evaluated(self, event):
         if event["is_best_program"]:
+            # average_score is the policy valset score (acceptance under FullEvaluationPolicy)
             delta = event["average_score"] - self.best_score
             self.best_score = event["average_score"]
             print(f"[iter {event['iteration']}] New best: {self.best_score:.4f}  (+{delta:.4f})")
@@ -133,7 +137,7 @@ class LMCallLogger:
             if isinstance(prompt, str):
                 print("PROMPT (last 500 chars):", prompt[-500:])
             print("RAW OUTPUT:", event["raw_lm_outputs"].get(component, "")[:500])
-            print("EXTRACTED:", event["new_instructions"].get(component, "")[:200])
+            print("EXTRACTED:", event["proposed_improvements"].get(component, "")[:200])
 ```
 
 ### 3. Identify which LM call produced each accepted candidate
@@ -151,7 +155,7 @@ class ProposalTracker:
         self._pending[event["iteration"]] = {
             "prompts": event["prompts"],
             "raw_lm_outputs": event["raw_lm_outputs"],
-            "new_instructions": event["new_instructions"],
+            "proposed_improvements": event["proposed_improvements"],
         }
 
     def on_candidate_accepted(self, event):
@@ -356,13 +360,14 @@ def on_iteration_end(self, event):
     # All candidate texts
     state.program_candidates          # list[dict[str, str]]
 
-    # Validation scores per candidate
-    state.prog_candidate_val_subscores  # list[dict[val_id, float]]
+    # Raw per-example metric scores per candidate
+    state.prog_candidate_per_example_scores  # list[dict[val_id, float]]
+    state.program_raw_scores_val_set         # property → mean raw score per candidate
 
-    # Aggregate val scores (one float per candidate)
-    state.program_full_scores_val_set   # property → list[float]
+    # Acceptance scores used for ranking (one float per candidate)
+    state.program_full_acceptance_scores_val_set   # property → list[float]
 
-    # Current Pareto front (val_id → best score)
+    # Instance Pareto front (val_id → best per-example acceptance)
     state.pareto_front_valset           # dict[val_id, float]
 
     # Which candidate(s) are best per val example

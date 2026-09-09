@@ -268,15 +268,15 @@ class MultiTraceEnv(Env):
         self.active_instances: Dict[int, ClusterType] = {}
         self.cost_history: List[Dict[int, ClusterType]] = []
         self.current_tick_costs: Dict[int, ClusterType] = {}
-        
+
         # Simple flag to track new launches
         self._new_launch_this_tick = False
         self._had_new_launch_last_tick = False
-        
+
         # Track region switches for dynamic migration time
         self._last_active_region: Optional[int] = None
         self._region_switch_info: Optional[Dict[str, Any]] = None
-        
+
         # Track total number of migrations
         self.migration_count: int = 0
 
@@ -354,20 +354,20 @@ class MultiTraceEnv(Env):
         assert self.observed_tick == self.tick - 1, (self.observed_tick,
                                                      self.tick)
         self.observed_tick = self.tick
-        
+
         # Finalize costs from previous tick
         if self.tick > 0:
             self._finalize_tick_costs()
-        
+
         # Update launch flags after finalizing costs
         # This ensures the flag reflects launches from the previous tick
         self._had_new_launch_last_tick = self._new_launch_this_tick
         self._new_launch_this_tick = False
-        
+
         # Clear tracking for new tick
         self._launched_this_tick = {}
         self._pending_overwrites = {}
-        
+
         # Handle preemptions in all regions
         for region in list(self.active_instances.keys()):
             if self.active_instances[region] == ClusterType.SPOT:
@@ -376,7 +376,7 @@ class MultiTraceEnv(Env):
                         f'Preempted at tick {self.tick} in region {region}'
                     )
                     self.active_instances.pop(region)
-        
+
         # Multi-region env doesn't use this interface anymore
         # This method is only here because it's abstract in base class
         return ClusterType.NONE, False
@@ -388,11 +388,11 @@ class MultiTraceEnv(Env):
     def get_num_regions(self) -> int:
         """Return the number of available regions."""
         return self.num_regions
-    
+
     def get_active_instances(self) -> Dict[int, ClusterType]:
         """Get currently active instances across all regions."""
         return self.active_instances.copy()
-    
+
     def get_region_name(self, region_idx: int) -> str:
         """Get the region name from trace filename."""
         trace_file = self._trace_files[region_idx]
@@ -404,34 +404,34 @@ class MultiTraceEnv(Env):
     def execute_multi_strategy(self, strategy: 'MultiRegionStrategy'):
         """Execute one step of a multi-region strategy using yield/generator pattern."""
         from sky_spot.multi_region_types import TryLaunch, Terminate, LaunchResult
-        
+
         # Reset safety net flag at the beginning of each tick
         self._safety_net_active = False
-        
+
         # SAFETY NET: Apply strong guarantee before executing strategy
         # This ensures all multi-region strategies respect deadline constraints
         remaining_time_seconds = math.floor(
             (strategy.deadline - self.elapsed_seconds) / self.gap_seconds
         ) * self.gap_seconds
         remaining_task_seconds = strategy.task_duration - sum(strategy.task_done_time)
-        
+
         # Check if we need to apply strong guarantee
         if remaining_task_seconds > 1e-3:  # Task not done yet
             total_task_remaining = math.ceil(
                 (remaining_task_seconds + strategy.restart_overhead) / self.gap_seconds
             ) * self.gap_seconds
-            
+
             if total_task_remaining >= remaining_time_seconds:
                 # We're in a critical situation - need to ensure ON_DEMAND
                 active_instances = self.get_active_instances()
-                
+
                 # Check if we have a working SPOT instance with no restart overhead
                 has_working_spot = False
                 for region, cluster_type in active_instances.items():
                     if cluster_type == ClusterType.SPOT and strategy.remaining_restart_overhead < 1e-3:
                         has_working_spot = True
                         break
-                
+
                 if not has_working_spot:
                     # Need ON_DEMAND to meet deadline
                     logger.warning(
@@ -439,49 +439,49 @@ class MultiTraceEnv(Env):
                         "(remaining time: %.0f s, needed: %.0f s)",
                         remaining_time_seconds, total_task_remaining
                     )
-                    
+
                     # First terminate any non-ON_DEMAND instances
                     for region, cluster_type in active_instances.items():
                         if cluster_type != ClusterType.ON_DEMAND:
                             self._terminate_internal(region)
-                    
+
                     # Then launch ON_DEMAND if we don't have one
                     if ClusterType.ON_DEMAND not in active_instances.values():
                         # Try to launch ON_DEMAND in any region
                         return_code = self._try_launch_internal(0, ClusterType.ON_DEMAND)
                         assert return_code, "Should have launched ON_DEMAND in region 0"
-                    
+
                     # Safety net has taken over - ignore all strategy actions this tick
                     self._safety_net_active = True
                     return
-        
+
         # Normal strategy execution
         # Don't initialize costs here - let actions and finalize handle it
         # This allows terminating at tick start without being charged
-        
+
         # Track instances launched in this tick to prevent same-tick termination of the same instance
         # Map region -> cluster_type that was launched this tick
         launched_this_tick = {}
-        
+
         # Get the generator from strategy
         gen = strategy._step_multi()
-        
+
         try:
             action = next(gen)
             while True:
                 result = None
-                
+
                 if isinstance(action, TryLaunch):
                     # Execute launch attempt
                     success = self._try_launch_internal(action.region, action.cluster_type)
                     if success:
                         launched_this_tick[action.region] = action.cluster_type
                     result = LaunchResult(
-                        success=success, 
+                        success=success,
                         region=action.region,
                         cluster_type=action.cluster_type if success else None
                     )
-                    
+
                 elif isinstance(action, Terminate):
                     # If safety net is active, ignore terminate actions
                     if hasattr(self, '_safety_net_active') and self._safety_net_active:
@@ -505,35 +505,35 @@ class MultiTraceEnv(Env):
                         result = None
                 else:
                     raise ValueError(f"Unknown action type: {type(action)}")
-                
+
                 # Send result back and get next action
                 action = gen.send(result)
-                
+
         except StopIteration:
             # Strategy finished for this tick
             # Validate that no region has multiple instances
             self._validate_no_multiple_instances()
-    
+
     def _try_launch_internal(self, region: int, cluster_type: ClusterType) -> bool:
         """Internal method to try launching an instance in a region."""
         # Track all launch attempts for validation later
         if not hasattr(self, '_launched_this_tick'):
             self._launched_this_tick = {}
-        
+
         # Record this launch attempt
         if region in self._launched_this_tick:
             # Multiple launches in same region - track them all for validation
             logger.debug(f"Multiple launch attempts in region {region}: {self._launched_this_tick[region].name} and {cluster_type.name}")
         self._launched_this_tick[region] = cluster_type
-        
+
         # Check availability
         if cluster_type == ClusterType.SPOT:
             if not self._spot_available_in_region(region):
                 return False
-        
+
         # Check if this is a cold start (no instances running anywhere)
         was_cold_start = len(self.active_instances) == 0 and self._last_active_region is None
-        
+
         # Check if this is a region switch
         is_region_switch = False
         # Region switch: we had an active region before but now launching in a different region
@@ -546,7 +546,7 @@ class MultiTraceEnv(Env):
             }
             logger.debug(f"Region switch detected: {self._last_active_region} -> {region} at tick {self.tick}")
             self.migration_count += 1
-        
+
         # Launch successful - but don't overwrite if instance exists
         # We'll validate at the end that strategy cleaned up properly
         if region not in self.active_instances:
@@ -566,7 +566,7 @@ class MultiTraceEnv(Env):
         self._last_active_region = region
         logger.debug(f"Launched {cluster_type.name} in region {region} (cold_start={was_cold_start}, region_switch={is_region_switch})")
         return True
-    
+
     def _terminate_internal(self, region: int):
         """Internal method to terminate an instance in a region."""
         if region in self.active_instances:
@@ -579,7 +579,7 @@ class MultiTraceEnv(Env):
             # This allows detecting region switches when terminate + launch in same tick
         else:
             logger.warning(f"No instance to terminate in region {region}")
-    
+
     def _validate_no_multiple_instances(self):
         """Validate that strategy properly terminated instances when switching types."""
         if hasattr(self, '_pending_overwrites') and self._pending_overwrites:
@@ -600,18 +600,18 @@ class MultiTraceEnv(Env):
                 self.active_instances[region] = new_type
                 self.current_tick_costs[region] = new_type
             self._pending_overwrites.clear()
-    
+
     def _finalize_tick_costs(self):
         """Internal method to finalize costs for the current tick."""
         # Ensure all active instances are accounted for
         for region, ctype in self.active_instances.items():
             if region not in self.current_tick_costs:
                 self.current_tick_costs[region] = ctype
-        
+
         # Record to history
         if self.current_tick_costs:  # Only record if there are costs
             self.cost_history.append(self.current_tick_costs.copy())
-        
+
         # Reset for next tick
         self.current_tick_costs = {}
 
@@ -622,21 +622,21 @@ class MultiTraceEnv(Env):
     def get_price(self) -> Dict[ClusterType, float]:
         # Multi-region env doesn't have a single price
         raise NotImplementedError("Use envs[region_idx].get_price() for specific region")
-    
+
     @property
     def accumulated_cost(self) -> float:
         """Calculate total accumulated cost across all regions."""
         total_cost = 0.0
-        
+
         # Sum costs from all ticks in cost history
         for tick_costs in self.cost_history:
             for region, cluster_type in tick_costs.items():
                 cost_map = self.envs[region].get_constant_cost_map()
                 cost_per_hour = cost_map[cluster_type]
                 total_cost += cost_per_hour * self.gap_seconds / 3600
-                    
+
         return total_cost
-    
+
     def get_cost_breakdown(self) -> Dict[str, typing.Any]:
         """Get detailed cost breakdown by region and type."""
         breakdown = {
@@ -649,7 +649,7 @@ class MultiTraceEnv(Env):
             },
             'tick_count': len(self.cost_history)
         }
-        
+
         # Calculate costs by region
         for region in range(self.num_regions):
             region_cost = 0.0
@@ -659,14 +659,14 @@ class MultiTraceEnv(Env):
                     cost_per_hour = cost_map[tick_costs[region]]
                     region_cost += cost_per_hour * self.gap_seconds / 3600
             breakdown['by_region'][region] = region_cost
-        
+
         # Calculate costs by type
         for tick_costs in self.cost_history:
             for region, cluster_type in tick_costs.items():
                 cost_map = self.envs[region].get_constant_cost_map()
                 cost_per_hour = cost_map[cluster_type]
                 breakdown['by_type'][cluster_type] += cost_per_hour * self.gap_seconds / 3600
-                
+
         return breakdown
 
     @property
@@ -675,7 +675,7 @@ class MultiTraceEnv(Env):
             'name': self.NAME,
             'trace_files': self._trace_files,
             'env_start_hours': self.envs[0]._start_index * self.gap_seconds / 3600 if self.envs else 0,
-            'gap_seconds': self.gap_seconds 
+            'gap_seconds': self.gap_seconds
         }
 
     @classmethod
@@ -693,7 +693,7 @@ class MultiTraceEnv(Env):
                            default=0,
                            help='Start hours of the trace')
         args, _ = parser.parse_known_args()
-        
+
         if hasattr(args, 'trace_files') and args.trace_files:
             return cls.create_env(args.trace_files, args.env_start_hours)
         else:
@@ -703,17 +703,17 @@ class MultiTraceEnv(Env):
                 return [cls([args.trace_file], args.env_start_hours)]
             else:
                 raise ValueError("Either --trace-files or --trace-file must be specified for multi_trace environment")
-    
+
     @classmethod
     def create_env(cls, trace_files_or_dirs: List[str],
                    env_start_hours: float) -> Sequence['MultiTraceEnv']:
         """Create MultiTraceEnv instances from trace files or directories.
-        
+
         If directories are provided, it will create one MultiTraceEnv with all json files from all directories.
         If files are provided, it will create one MultiTraceEnv with those files.
         """
         all_trace_files = []
-        
+
         for path in trace_files_or_dirs:
             if os.path.isdir(path):
                 # If it's a directory, add all json files from it
@@ -723,24 +723,24 @@ class MultiTraceEnv(Env):
             else:
                 # If it's a file, add it directly
                 all_trace_files.append(path)
-        
+
         if not all_trace_files:
             raise ValueError("No trace files found in the specified paths")
-        
+
         # Return a single MultiTraceEnv with all trace files
         return [cls(all_trace_files, env_start_hours)]
 
     def update_strategy_progress(self, strategy: 'MultiRegionStrategy'):
         """Update task progress for multi-region strategies.
-        
+
         This method replicates the task progress update logic from Strategy.step()
         for multi-region strategies that don't use step().
         """
         # Get information about which instances ran last tick
         active_instances = self.get_active_instances()
-        
+
         logger.debug(f"update_strategy_progress: tick={self.tick}, active_instances={active_instances}")
-        
+
         if not active_instances:
             # No instance running, no progress
             strategy.task_done_time.append(0)
@@ -752,18 +752,18 @@ class MultiTraceEnv(Env):
                 if self._region_switch_info is not None and self._region_switch_info['tick'] == self.tick - 1:
                     # Use dynamic migration model for region switches
                     from sky_spot.migration_model import get_migration_time_hours
-                    
+
                     # Get region names
                     from_region_name = self.get_region_name(self._region_switch_info['from_region'])
                     to_region_name = self.get_region_name(self._region_switch_info['to_region'])
-                    
+
                     # Get checkpoint size from task
                     checkpoint_size_gb = getattr(strategy.task, 'checkpoint_size_gb', 50.0)  # Default to 50GB
-                    
+
                     # Get instance startup time from restart overhead
                     # For migration, use the restart overhead as the base startup time
                     instance_startup_hours = strategy.restart_overheads[0] / 3600.0  # Convert to hours
-                    
+
                     # Calculate dynamic migration time
                     migration_hours = get_migration_time_hours(
                         from_region_name, to_region_name, checkpoint_size_gb,
@@ -774,7 +774,7 @@ class MultiTraceEnv(Env):
                     strategy.remaining_restart_overhead = migration_hours * 3600  # Convert to seconds
                     logger.debug(f"Applied dynamic migration overhead: {migration_hours:.2f} hours "
                                f"({from_region_name} -> {to_region_name}, {checkpoint_size_gb}GB)")
-                    
+
                     # Clear region switch info
                     self._region_switch_info = None
                 else:
@@ -786,23 +786,23 @@ class MultiTraceEnv(Env):
                     restart_idx = min(current_subtask_index, len(strategy.restart_overheads) - 1)
                     strategy.remaining_restart_overhead = strategy.restart_overheads[restart_idx]
                     logger.debug(f"Applied restart overhead for new launch: {strategy.remaining_restart_overhead}s")
-            
+
             # Calculate available time (one gap_second)
             available_time = self.gap_seconds
-            
+
             # Account for restart overhead
             task_done_time = max(available_time - strategy.remaining_restart_overhead, 0)
             strategy.remaining_restart_overhead -= (available_time - task_done_time)
             if strategy.remaining_restart_overhead < 1e-3:
                 strategy.remaining_restart_overhead = 0
-            
+
             # Don't exceed remaining task time
             remaining_task_time = strategy.task_duration - sum(strategy.task_done_time)
             task_done_time = min(task_done_time, remaining_task_time)
-            
+
             logger.debug(f"Appending task_done_time={task_done_time}, remaining_restart_overhead={strategy.remaining_restart_overhead}")
             strategy.task_done_time.append(task_done_time)
-        
+
         # Handle ChainedTask updates (similar to Strategy.step())
         if hasattr(strategy, '_last_known_subtask_index') and hasattr(strategy.task, 'get_info'):
             task_info = strategy.task.get_info()

@@ -16,17 +16,17 @@ from examples.adrs.cloudcast.utils.cloudcast.broadcast import BroadCastTopology
 def search_algorithm(src, dsts, G, num_partitions):
     """
     Find broadcast paths from source to all destinations.
-    
+
     This is the function that GEPA will evolve to optimize broadcast routing.
     The baseline implementation uses Dijkstra's shortest path algorithm
     based on cost as the edge weight.
-    
+
     Args:
         src: Source node identifier (e.g., "aws:ap-northeast-1")
         dsts: List of destination node identifiers
         G: NetworkX DiGraph with cost and throughput edge attributes
         num_partitions: Number of data partitions
-        
+
     Returns:
         BroadCastTopology object with paths for all destinations and partitions
     """
@@ -48,27 +48,27 @@ def search_algorithm(src, dsts, G, num_partitions):
 def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
     """
     Create a NetworkX graph with capacity constraints and cost info.
-    
+
     This is included in the initial program so evolved programs have access
     to the graph creation utility.
-    
+
     Args:
         cost_path: Path to cost CSV file
-        throughput_path: Path to throughput CSV file  
+        throughput_path: Path to throughput CSV file
         num_vms: Number of VMs per region (scales throughput)
-        
+
     Returns:
         networkx.DiGraph with cost and throughput edge attributes
     """
     # Get paths relative to this file's location
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    
+
     if cost_path is None:
         cost_path = os.path.join(current_dir, "profiles/cost.csv")
-    
+
     if throughput_path is None:
         throughput_path = os.path.join(current_dir, "profiles/throughput.csv")
-    
+
     cost = pd.read_csv(cost_path)
     throughput = pd.read_csv(throughput_path)
 
@@ -77,9 +77,9 @@ def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
         if row["src_region"] == row["dst_region"]:
             continue
         G.add_edge(
-            row["src_region"], 
-            row["dst_region"], 
-            cost=None, 
+            row["src_region"],
+            row["dst_region"],
+            cost=None,
             throughput=num_vms * row["throughput_sent"] / 1e9
         )
 
@@ -93,7 +93,7 @@ def make_nx_graph(cost_path=None, throughput_path=None, num_vms=1):
         src, dst = edge[0], edge[1]
         if edge[-1]["cost"] is None:
             no_cost_pairs.append((src, dst))
-    
+
     if no_cost_pairs:
         print("Unable to get costs for: ", no_cost_pairs)
 

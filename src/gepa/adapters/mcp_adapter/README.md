@@ -70,7 +70,7 @@ dataset = [
 adapter = MCPAdapter(
     server_params=server_params,
     tool_names=["read_file", "write_file", "list_files"],  # Multiple tools for selection
-    task_model="ollama/llama3.2:1b",  # Local model via Ollama, replace with your model 
+    task_model="ollama/llama3.2:1b",  # Local model via Ollama, replace with your model
     metric_fn=lambda item, output: 1.0 if item["reference_answer"] in output else 0.0,
 )
 
@@ -80,7 +80,7 @@ result = gepa.optimize(
     trainset=dataset[:20],
     valset=dataset[20:],
     adapter=adapter,
-    reflection_lm="ollama/llama3.1:8b",  # Larger local model for reflection replace with our choice 
+    reflection_lm="ollama/llama3.1:8b",  # Larger local model for reflection replace with our choice
     max_metric_calls=150,
 )
 
@@ -97,14 +97,14 @@ ollama pull llama3.1:8b
 ollama pull llama3.2:1b
 ```
 
-### Option 2: OpenAI API 
+### Option 2: OpenAI API
 
 ```python
 # Same as above, but use OpenAI models
 adapter = MCPAdapter(
     server_params=server_params,
     tool_names=["read_file", "write_file", "list_files"],  # Multiple tools for selection
-    task_model="openai/gpt-4o-mini",  # OpenAI API,  replace with your model choice 
+    task_model="openai/gpt-4o-mini",  # OpenAI API,  replace with your model choice
     metric_fn=lambda item, output: 1.0 if item["reference_answer"] in output else 0.0,
 )
 
@@ -113,7 +113,7 @@ result = gepa.optimize(
     trainset=dataset[:20],
     valset=dataset[20:],
     adapter=adapter,
-    reflection_lm="openai/gpt-5",  # OpenAI for reflection, replace with yout model choice 
+    reflection_lm="openai/gpt-5",  # OpenAI for reflection, replace with yout model choice
     max_metric_calls=150,
 )
 ```
@@ -542,7 +542,7 @@ Each `evaluate()` call spawns a new MCP server process:
 - Startup time: ~100-500ms
 - Total overhead for 150 evals: ~15-75 seconds
 
-This is early development MVP and overhead is expected as MCP is async and GEPA is still syc but plan is to add following features later 
+This is early development MVP and overhead is expected as MCP is async and GEPA is still syc but plan is to add following features later
 - Session pooling (reuse processes)
 - Background event loop (persistent session)
 - Async GEPA core (native async support)

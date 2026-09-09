@@ -25,7 +25,7 @@ The script auto-generates documentation for all items in `API_MAPPING`, includin
 - **Core**: optimize, GEPAAdapter, EvaluationBatch, GEPAResult, GEPACallback, DataLoader, GEPAState, EvaluationCache
 - **Callbacks**: All event types (OptimizationStartEvent, IterationEndEvent, etc.) and CompositeCallback
 - **Stop Conditions**: All stopper classes
-- **Adapters**: DefaultAdapter, DSPyAdapter, RAGAdapter, MCPAdapter, etc.
+- **Adapters**: DefaultAdapter, ConfidenceAdapter, RAGAdapter, MCPAdapter, etc.
 - **Proposers**: CandidateProposal, ReflectiveMutationProposer, MergeProposer, etc.
 - **Logging**: LoggerProtocol, StdOutLogger, Logger, ExperimentTracker, create_experiment_tracker
 - **Strategies**: BatchSampler, CandidateSelector, ComponentSelector, EvaluationPolicy variants
@@ -104,7 +104,7 @@ The API documentation is auto-generated from `scripts/generate_api_docs.py`:
 2. Run `uv run python scripts/generate_api_docs.py` to regenerate all API docs
 3. Add the new page to the `nav` section in `mkdocs.yml`
 
-**Note**: The `API_MAPPING` in `generate_api_docs.py` is the source of truth for API documentation. 
+**Note**: The `API_MAPPING` in `generate_api_docs.py` is the source of truth for API documentation.
 The script auto-generates both the markdown files and the index content.
 
 ## Automation Features

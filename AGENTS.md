@@ -7,7 +7,7 @@ GEPA (Genetic-Pareto) is a Python framework for optimizing text components (AI p
 We use **uv** for dependency management. The project uses setuptools as the build backend. All python executions must be done through uv.
 
 ```bash
-uv sync --extra dev
+make install
 ```
 
 ## Project Structure
@@ -24,15 +24,17 @@ uv sync --extra dev
 ## Build & Test
 
 ```bash
-uv run pytest
-uv run ruff check src/
-uv run ruff format src/
-uv run pyright src/
+make format      # format code
+make lint        # check formatting and lint
+make typecheck   # run pyright
+make test        # run tests with coverage
+make all         # format, lint, typecheck, testcov
+make pre-commit  # run all pre-commit hooks
 ```
 
 ## Code Style
 
 - Linter/formatter: ruff (line length 120, double quotes, space indent)
 - Type checking: pyright
-- Python target: 3.10+
+- Python target: 3.13+
 - No relative imports (enforced by ruff)

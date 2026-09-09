@@ -13,16 +13,16 @@ class SingleDstPath(Dict):
 class BroadCastTopology:
     """
     Represents a broadcast topology for multi-destination data transfer.
-    
+
     The topology tracks paths from a single source to multiple destinations,
     with support for data partitioning to optimize transfer efficiency.
     """
-    
+
     def __init__(
-        self, 
-        src: str, 
-        dsts: List[str], 
-        num_partitions: int = 4, 
+        self,
+        src: str,
+        dsts: List[str],
+        num_partitions: int = 4,
         paths: Dict[str, SingleDstPath] = None
     ):
         self.src = src  # single str
@@ -36,7 +36,7 @@ class BroadCastTopology:
             self.set_graph()
         else:
             self.paths = {
-                dst: {str(i): None for i in range(num_partitions)} 
+                dst: {str(i): None for i in range(num_partitions)}
                 for dst in dsts
             }
 

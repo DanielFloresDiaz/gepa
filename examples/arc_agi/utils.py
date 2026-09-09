@@ -405,4 +405,3 @@ def evaluate_on_testset(
     solved = sum(1 for s in scores if s == 1.0)
     print(f"  Solved: {solved}/{len(scores)}")
     return solved / len(scores) if scores else 0.0
-

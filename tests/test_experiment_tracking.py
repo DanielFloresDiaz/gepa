@@ -12,7 +12,7 @@ from gepa.logging.experiment_tracker import ExperimentTracker, create_experiment
 def has_wandb():
     """Check if wandb is available."""
     try:
-        import wandb  # noqa: F401
+        import wandb
 
         return True
     except ImportError:
@@ -22,7 +22,7 @@ def has_wandb():
 def has_mlflow():
     """Check if mlflow is available."""
     try:
-        import mlflow  # noqa: F401
+        import mlflow
 
         return True
     except ImportError:

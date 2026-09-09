@@ -18,7 +18,7 @@ class RoundRobinReflectionComponentSelector(ReflectionComponentSelector):
     ) -> list[str]:
         pid = state.named_predictor_id_to_update_next_for_program_candidate[candidate_idx]
         state.named_predictor_id_to_update_next_for_program_candidate[candidate_idx] = (pid + 1) % len(
-            state.list_of_named_predictors
+            state.list_of_named_predictors  # legacy state key: ordered component names
         )
         name = state.list_of_named_predictors[pid]
         return [name]

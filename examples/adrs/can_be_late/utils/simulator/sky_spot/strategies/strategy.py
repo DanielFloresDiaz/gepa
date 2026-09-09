@@ -262,37 +262,37 @@ class Strategy:
 
 class MultiRegionStrategy(Strategy):
     """Base class for multi-region strategies using yield/generator pattern."""
-    
+
     # Override NAME to avoid conflict with parent class registration
     NAME = 'multi_region_base'
-    
+
     def __init_subclass__(cls):
         # Don't register the base multi-region class
         if cls.NAME != 'multi_region_base':
             super().__init_subclass__()
-    
+
     def step(self) -> ClusterType:
         """Not used for multi-region strategies."""
         raise NotImplementedError(
             f"{self.__class__.__name__} is a multi-region strategy and should use _step_multi() instead"
         )
-    
+
     def _step(self, last_cluster_type: ClusterType, has_spot: bool) -> ClusterType:
         """Not used for multi-region strategies."""
         # This should never be called for multi-region strategies
         raise NotImplementedError(
             f"{self.__class__.__name__} is a multi-region strategy and should use _step_multi() instead"
         )
-    
+
     def _step_multi(self) -> typing.Generator['Action', typing.Optional['LaunchResult'], None]:
         """Multi-region strategy interface using yield/generator pattern.
-        
+
         Yields:
             Action: The action to perform (TryLaunch or Terminate)
-            
+
         Receives:
             Optional[LaunchResult]: Result of TryLaunch action (None for Terminate)
-            
+
         Example:
             # Try to launch in region 0
             result = yield TryLaunch(region=0, cluster_type=ClusterType.SPOT)

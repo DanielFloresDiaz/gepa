@@ -713,10 +713,10 @@ Provide the new parameter value within ``` blocks."""
 # --- Component 2: Proposer Configurations ---
 @dataclass
 class ReflectionConfig:
-    """Controls how the LLM proposes improved candidates each iteration.
+    """Controls how the LLM proposes component improvements each iteration.
 
     The reflection LM sees evaluation feedback (side_info) for a minibatch of
-    examples and proposes an improved candidate.  ``reflection_lm`` is the
+    examples and proposes improved component values.  ``reflection_lm`` is the
     model used for this step (defaults to ``openai/gpt-5.1``).
 
     ``reflection_minibatch_size`` controls how many examples are shown per
@@ -731,6 +731,7 @@ class ReflectionConfig:
     perfect_score: float | None = None
     batch_sampler: BatchSampler | Literal["epoch_shuffled"] = "epoch_shuffled"
     reflection_minibatch_size: int | None = None  # Default: 1 for single-instance mode, 3 otherwise
+    component_selector: ReflectionComponentSelector | Literal["round_robin", "all"] | None = None
     module_selector: ReflectionComponentSelector | Literal["round_robin", "all"] = "round_robin"
     reflection_lm: LanguageModel | str | None = "openai/gpt-5.1"
     reflection_lm_kwargs: dict[str, Any] | None = None
@@ -739,7 +740,16 @@ class ReflectionConfig:
     ``{"reasoning_effort": "high", "temperature": 0.7}``).
     Ignored when ``reflection_lm`` is already a callable."""
     reflection_prompt_template: str | dict[str, str] | None = optimize_anything_reflection_prompt_template
+    custom_component_proposer: ProposalFn | None = None
     custom_candidate_proposer: ProposalFn | None = None
+
+    def __post_init__(self) -> None:
+        if self.component_selector is not None and self.module_selector != "round_robin":
+            raise ValueError("Pass only one of component_selector or module_selector in ReflectionConfig, not both.")
+        if self.custom_component_proposer is not None and self.custom_candidate_proposer is not None:
+            raise ValueError(
+                "Pass only one of custom_component_proposer or custom_candidate_proposer in ReflectionConfig, not both."
+            )
 
 
 @dataclass
@@ -1475,21 +1485,44 @@ def optimize_anything(
             "acceptance_criterion must be a supported string strategy or an instance of AcceptanceCriterion."
         )
 
-    # --- 6. Build module selector from ReflectionConfig ---
-    if isinstance(config.reflection.module_selector, str):
+    # --- 6. Build component selector from ReflectionConfig ---
+    if config.reflection.component_selector is not None:
+        selector_cfg = config.reflection.component_selector
+    elif config.reflection.module_selector != "round_robin":
+        warnings.warn(
+            "ReflectionConfig.module_selector is deprecated; use component_selector instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        selector_cfg = config.reflection.module_selector
+    else:
+        selector_cfg = "round_robin"
+
+    if isinstance(selector_cfg, str):
         module_selector_cls = {
             "round_robin": RoundRobinReflectionComponentSelector,
             "all": AllReflectionComponentSelector,
-        }.get(config.reflection.module_selector)
+        }.get(selector_cfg)
 
         assert module_selector_cls is not None, (
-            f"Unknown module_selector strategy: {config.reflection.module_selector}. "
-            "Supported strategies: 'round_robin', 'all'"
+            f"Unknown component_selector strategy: {selector_cfg}. Supported strategies: 'round_robin', 'all'"
         )
 
         module_selector_instance: ReflectionComponentSelector = module_selector_cls()
     else:
-        module_selector_instance = config.reflection.module_selector
+        module_selector_instance = selector_cfg
+
+    if config.reflection.custom_component_proposer is not None:
+        resolved_custom_proposer = config.reflection.custom_component_proposer
+    elif config.reflection.custom_candidate_proposer is not None:
+        warnings.warn(
+            "ReflectionConfig.custom_candidate_proposer is deprecated; use custom_component_proposer instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        resolved_custom_proposer = config.reflection.custom_candidate_proposer
+    else:
+        resolved_custom_proposer = None
 
     # --- 7. Build batch sampler from ReflectionConfig ---
     if config.reflection.batch_sampler == "epoch_shuffled":
@@ -1568,7 +1601,7 @@ def optimize_anything(
         experiment_tracker=experiment_tracker,
         reflection_lm=config.reflection.reflection_lm,
         reflection_prompt_template=config.reflection.reflection_prompt_template,
-        custom_candidate_proposer=config.reflection.custom_candidate_proposer,
+        custom_candidate_proposer=resolved_custom_proposer,
         callbacks=config.callbacks,
     )
 

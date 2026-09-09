@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)
 def _simulate_one(env: env_lib.Env, strategy: strategy_lib.Strategy):
     history = []
     last_request_type = ClusterType.NONE
-    
+
     # Check if this is a multi-region setup
     is_multi_region = (
-        isinstance(strategy, MultiRegionStrategy) and 
+        isinstance(strategy, MultiRegionStrategy) and
         isinstance(env, env_lib.MultiTraceEnv)
     )
     multi_env = typing.cast(env_lib.MultiTraceEnv, env)
@@ -35,17 +35,17 @@ def _simulate_one(env: env_lib.Env, strategy: strategy_lib.Strategy):
             # Multi-region execution path
             multi_env.observe()
             multi_env.update_strategy_progress(multi_strategy)  # Update task progress based on PREVIOUS tick
-            
+
             # Check if task became done after progress update
             if strategy.task_done:
                 break
-                
+
             multi_env.execute_multi_strategy(multi_strategy)
             multi_env.tick += 1
-            
+
             # Finalize costs for this tick (they will be recorded in next observe())
             # This ensures costs are properly tracked even for the last tick
-            
+
             # For history tracking, use a representative request type
             # (could be enhanced to track all regions)
             active = multi_env.get_active_instances()
@@ -64,18 +64,18 @@ def _simulate_one(env: env_lib.Env, strategy: strategy_lib.Strategy):
             **env.info(),
             **strategy.info(),
         }
-        
+
         # Add multi-region specific info if applicable
         if is_multi_region:
             cost_breakdown = multi_env.get_cost_breakdown()
             # Convert ClusterType keys to strings for JSON serialization
             cost_by_type_str = {k.name: v for k, v in cost_breakdown['by_type'].items()}
-            
+
             # Add spot availability for each region
             spot_availability = {}
             for region in range(multi_env.num_regions):
                 spot_availability[region] = multi_env._spot_available_in_region(region)
-                    
+
             info.update({
                 "ActiveRegions": len(multi_env.get_active_instances()),
                 "CostByRegion": cost_breakdown['by_region'],
@@ -84,7 +84,7 @@ def _simulate_one(env: env_lib.Env, strategy: strategy_lib.Strategy):
                 "ActiveInstances": {k: v.name for k, v in multi_env.get_active_instances().items()},
                 "MigrationCount": multi_env.migration_count,
             })
-        
+
         last_request_type = request_type
         history.append(info)
         wandb_log(info)
@@ -102,13 +102,13 @@ def _simulate_one(env: env_lib.Env, strategy: strategy_lib.Strategy):
     else:
         strategy.step()  # realize the last step
         env.step(ClusterType.NONE)
-    
+
     info = {
         "RequestType": ClusterType.NONE.value,
         **env.info(),
         **strategy.info(),
     }
-    
+
     if is_multi_region:
         cost_breakdown = multi_env.get_cost_breakdown()
         info.update({
@@ -116,7 +116,7 @@ def _simulate_one(env: env_lib.Env, strategy: strategy_lib.Strategy):
             "CostByRegion": cost_breakdown['by_region'],
             "CostByType": cost_breakdown['by_type'],
         })
-    
+
     return history, env.tick
 
 
@@ -139,7 +139,7 @@ def simulate(
     assert len(restart_overhead_hours) == 1, "Only one restart overhead is supported"
     max_restart_overhead = max(restart_overhead_hours) if restart_overhead_hours else 0
     min_time_needed = task_duration_hours + max_restart_overhead
-    
+
     if min_time_needed > deadline_hours:
         error_msg = (
             f"Task infeasible: minimum time needed ({min_time_needed:.2f}h = "
@@ -148,7 +148,7 @@ def simulate(
         )
         logger.error(error_msg)
         raise ValueError(error_msg)
-    
+
     # Pre-check: Ensure trace data covers the deadline period
     # This check is important to prevent out-of-bounds errors during simulation
     for i, env in enumerate(envs):
@@ -156,7 +156,7 @@ def simulate(
             # Single-region environment
             trace_duration_seconds = (len(env.trace) - env._start_index) * env.gap_seconds
             trace_duration_hours = trace_duration_seconds / 3600
-            
+
             if trace_duration_hours < deadline_hours:
                 error_msg = (
                     f"Trace data insufficient: trace {i} duration ({trace_duration_hours:.2f}h) "
@@ -172,7 +172,7 @@ def simulate(
                 if hasattr(region_env, 'trace') and hasattr(region_env, '_start_index'):
                     trace_duration_seconds = (len(region_env.trace) - region_env._start_index) * region_env.gap_seconds
                     trace_duration_hours = trace_duration_seconds / 3600
-                    
+
                     if trace_duration_hours < deadline_hours:
                         error_msg = (
                             f"Trace data insufficient: region {region_idx} trace duration ({trace_duration_hours:.2f}h) "
@@ -182,7 +182,7 @@ def simulate(
                         )
                         logger.error(error_msg)
                         raise ValueError(error_msg)
-    
+
     histories = []
     costs = []
     ticks = []
@@ -253,7 +253,7 @@ def simulate(
         histories.append(history)
         costs.append(history[-1]["Cost"])
         ticks.append(tick)
-        
+
         # Extract migration count if available (multi-region)
         migration_count = history[-1].get("MigrationCount", 0)
         migrations.append(migration_count)

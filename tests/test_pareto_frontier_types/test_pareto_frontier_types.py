@@ -110,7 +110,7 @@ def test_pareto_frontier_type(mocked_lms, recorder_dir, frontier_type):
     )
     assert gepa_result.total_metric_calls in [36, 48]
 
-    best_score = gepa_result.val_aggregate_scores[gepa_result.best_idx]
+    best_score = gepa_result.val_acceptance_scores[gepa_result.best_idx]
     print(f"\n[{frontier_type}] Best score: {best_score}")
     if gepa_result.val_aggregate_subscores:
         best_subscores = gepa_result.val_aggregate_subscores[gepa_result.best_idx]

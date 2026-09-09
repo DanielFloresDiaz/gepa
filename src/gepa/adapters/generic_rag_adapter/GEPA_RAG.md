@@ -30,7 +30,7 @@ pip install -r requirements-rag.txt
 
 # Option B: Install specific vector store dependencies
 pip install litellm chromadb                    # For ChromaDB
-pip install litellm weaviate-client             # For Weaviate  
+pip install litellm weaviate-client             # For Weaviate
 pip install litellm lancedb pyarrow             # For LanceDB
 pip install litellm pymilvus                    # For Milvus
 pip install litellm qdrant-client               # For Qdrant
@@ -547,7 +547,7 @@ We've consolidated all vector database examples into a single, unified script in
 - **[Unified RAG Optimization](examples/rag_adapter/rag_optimization.py)** - One script supporting all vector stores
   - ChromaDB - Local development, no Docker required
   - Weaviate - Production deployment with hybrid search
-  - Qdrant - High performance with advanced filtering  
+  - Qdrant - High performance with advanced filtering
   - Milvus - Cloud-native with Milvus Lite
   - LanceDB - Serverless, developer-friendly
 

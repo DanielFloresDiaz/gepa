@@ -37,7 +37,7 @@ This guide demonstrates how to use GEPA's Generic RAG Adapter with the new **uni
    ```
 
    **Install RAG Adapter Dependencies:**
-   
+
    You can either install all vector store dependencies or specific ones:
 
    ```bash
@@ -48,7 +48,7 @@ This guide demonstrates how to use GEPA's Generic RAG Adapter with the new **uni
    # ChromaDB (easiest to start with)
    pip install litellm chromadb
 
-   # LanceDB (serverless, no Docker needed)  
+   # LanceDB (serverless, no Docker needed)
    pip install litellm lancedb pyarrow
 
    # Milvus (local Lite mode)

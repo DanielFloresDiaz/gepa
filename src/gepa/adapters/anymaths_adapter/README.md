@@ -192,7 +192,7 @@ How to run the evaluation script:
     3. **Score Determination**:
         - *Input*: "Ella got 4 incorrect answers; Marion got 6 more than half of Ella's score."
         - *Solution*: Total items = 40, Ella's correct = 36, half = 18, Marion = 18 + 6 = 24.
-        
+
     ---
 
     ### **Key Niche Information**
@@ -260,15 +260,15 @@ How to run the evaluation script:
 
     4. **Verify Arithmetic and Logic:**
     - Check for arithmetic errors (e.g., 1/10 of 70 = 7, not 70 - 7 = 63).
-    - Validate that the solution aligns with the problem’s constraints (e.g., no negative scores unless explicitly allowed).
+    - Validate that the solution aligns with the problem's constraints (e.g., no negative scores unless explicitly allowed).
 
     5. **Document Step-by-Step Reasoning:**
     - Break down the problem into logical steps, explicitly showing calculations (e.g., total birds = sum of daily totals).
     - Use parentheses and order of operations to avoid errors (e.g., 5 sites × 7 birds/site = 35 birds).
 
     6. **Final Answer Validation:**
-    - Ensure the final answer matches the problem’s question (e.g., total marks, average per site, or time difference).
-    - Recheck all steps to confirm consistency with the problem’s context.
+    - Ensure the final answer matches the problem's question (e.g., total marks, average per site, or time difference).
+    - Recheck all steps to confirm consistency with the problem's context.
 
     **Example Application:**
     For a problem like:
@@ -289,12 +289,12 @@ How to run the evaluation script:
 
     **Here's your process:**
 
-    1.  **Deconstruction & Contextual Understanding:** Carefully read the entire problem description. Identify *all* numerical values, units (e.g., kg, mph, minutes, dollars, meters, seconds), and relevant contextual details. Pay close attention to *all* constraints or limitations mentioned (e.g., “cannot exceed,” “up to,” “at most,” “within a tolerance of”).  Crucially, identify the *assumptions* embedded within the problem – what is being taken for granted?  For instance, is the problem implicitly stating that surfaces are flat, or that materials behave ideally?
+    1.  **Deconstruction & Contextual Understanding:** Carefully read the entire problem description. Identify *all* numerical values, units (e.g., kg, mph, minutes, dollars, meters, seconds), and relevant contextual details. Pay close attention to *all* constraints or limitations mentioned (e.g., "cannot exceed," "up to," "at most," "within a tolerance of").  Crucially, identify the *assumptions* embedded within the problem – what is being taken for granted?  For instance, is the problem implicitly stating that surfaces are flat, or that materials behave ideally?
 
-    2.  **Unit Analysis and Conversion:**  Recognize that the problem fundamentally involves numerical calculations. However, rigorous unit conversion is paramount. Ensure 
+    2.  **Unit Analysis and Conversion:**  Recognize that the problem fundamentally involves numerical calculations. However, rigorous unit conversion is paramount. Ensure
     all calculations are performed with appropriate units. If units are mixed, perform conversions *accurately*. Specifically, you must be able to handle conversions between common units: kilograms (kg), miles per hour (mph), minutes, dollars, meters, seconds, Newtons (N), cubic meters (m³), and other quantities.  **Important:** Weight and mass are frequently confused.  Remember that weight is a force (typically measured in Newtons – N), while mass is a measure of matter (typically measured in kilograms – kg). Always consider the context when given a weight value – it *usually* implies the force due to gravity.
 
-    3.  **Strategic Approach Selection:** For most problems, a straightforward algebraic approach will be effective.  Setting up equations based on the given information is usually the most efficient method.  However, consider scenarios where a simpler calculation (e.g., direct multiplication or division) is sufficient.  Furthermore, recognize that some problems may benefit from applying principles of physics (e.g., Newton’s Laws of Motion, conservation of energy) to derive equations.
+    3.  **Strategic Approach Selection:** For most problems, a straightforward algebraic approach will be effective.  Setting up equations based on the given information is usually the most efficient method.  However, consider scenarios where a simpler calculation (e.g., direct multiplication or division) is sufficient.  Furthermore, recognize that some problems may benefit from applying principles of physics (e.g., Newton's Laws of Motion, conservation of energy) to derive equations.
 
     4.  **Step-by-Step Calculation with Intermediate Results:** Clearly articulate *each* step of your calculation, showing all intermediate results.  This is absolutely crucial for verification, debugging, and demonstrating your thought process. Include units with every calculation.
 

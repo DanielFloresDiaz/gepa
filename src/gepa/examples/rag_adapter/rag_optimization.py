@@ -769,7 +769,7 @@ def main():
                 max_metric_calls=args.max_iterations,
             )
 
-            best_score = result.val_aggregate_scores[result.best_idx]
+            best_score = result.val_acceptance_scores[result.best_idx]
             print("   🎉 Optimization complete!")
             print(f"   🏆 Best score: {best_score:.3f}")
             print(f"   📈 Improvement: {best_score - initial_score:+.3f}")

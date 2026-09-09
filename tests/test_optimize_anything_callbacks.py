@@ -3,11 +3,9 @@
 
 """Tests for GEPACallback support in optimize_anything."""
 
-from unittest.mock import MagicMock
-
 from gepa.optimize_anything import (
-    GEPAConfig,
     EngineConfig,
+    GEPAConfig,
     ReflectionConfig,
     optimize_anything,
 )

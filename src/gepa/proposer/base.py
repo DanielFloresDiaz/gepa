@@ -32,16 +32,26 @@ class SubsampleEvaluation:
 class CandidateProposal(Generic[DataId, CandidateT]):
     candidate: dict[str, CandidateT]
     parent_program_ids: list[int]
-    # Optional mini-batch / subsample info
-    subsample_indices: list[DataId] | None = None
-    subsample_scores_before: list[float] | None = None
-    subsample_scores_after: list[float] | None = None
+    subsample_indices: list[DataId]
+    subsample_scores_before: list[float]
+    subsample_scores_after: list[float]
     # Rich evaluation data (superset of scores — includes outputs, objective_scores, trajectories)
     eval_before: SubsampleEvaluation | None = None
     eval_after: SubsampleEvaluation | None = None
     # Free-form metadata for logging/trace
     tag: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        n_indices = len(self.subsample_indices)
+        n_before = len(self.subsample_scores_before)
+        n_after = len(self.subsample_scores_after)
+        if n_before != n_indices or n_after != n_indices:
+            raise ValueError(
+                "subsample_indices length "
+                f"({n_indices}) must match subsample_scores_before ({n_before}) "
+                f"and subsample_scores_after ({n_after})"
+            )
 
 
 class ProposeNewCandidate(Protocol[DataId]):
