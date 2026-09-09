@@ -85,7 +85,7 @@ class RoundRobinSampleEvaluationPolicy(EvaluationPolicy[DataId, DataInst]):
     def get_best_program(self, state: GEPAState) -> ProgramIdx:
         """Pick the program whose evaluated validation scores achieve the highest average."""
         best_idx, best_score, best_coverage = -1, float("-inf"), -1
-        for program_idx, scores in enumerate(state.prog_candidate_val_subscores):
+        for program_idx, scores in enumerate(state.prog_candidate_per_example_scores):
             coverage = len(scores)
             avg = sum(scores.values()) / coverage if coverage else float("-inf")
             if avg > best_score or (avg == best_score and coverage > best_coverage):
@@ -130,10 +130,10 @@ def test_incremental_eval_policy_handles_dynamic_valset(tmp_path):
 
     assert val_loader.expansions == 1
 
-    covered_ids = set().union(*(scores.keys() for scores in result.val_subscores))
+    covered_ids = set().union(*(scores.keys() for scores in result.val_per_example_scores))
     assert 2 in covered_ids
 
     # Ensure round-robin policy limited the batch size for new candidates once the loader grew.
-    non_seed_batch_sizes = {len(scores) for scores in result.val_subscores[1:]}
+    non_seed_batch_sizes = {len(scores) for scores in result.val_per_example_scores[1:]}
     assert non_seed_batch_sizes
     assert max(non_seed_batch_sizes) <= 2

@@ -44,7 +44,7 @@ def candidate_tree_dot_from_data(
     Args:
         candidates: List of candidate dicts (index → component name → text).
         parents: ``parents[i]`` is a list of parent indices for candidate *i*.
-        val_scores: Per-candidate aggregate validation score.
+        val_scores: Per-candidate acceptance score.
         pareto_front_programs: Per-val-example best candidate sets.
 
     Returns:
@@ -69,7 +69,7 @@ def candidate_tree_dot_from_data(
 
         # Tooltip
         tooltip_parts = [f"Candidate {idx}"]
-        tooltip_parts.append(f"Val Score: {score:.4f}")
+        tooltip_parts.append(f"Acceptance score: {score:.4f}")
         parent_str = ", ".join(str(p) for p in pars if p is not None) or "seed"
         tooltip_parts.append(f"Parent(s): {parent_str}")
         if idx == best_idx:
@@ -118,7 +118,7 @@ def candidate_tree_html_from_data(
     Args:
         candidates: List of candidate dicts.
         parents: Lineage list.
-        val_scores: Per-candidate aggregate val scores.
+        val_scores: Per-candidate acceptance score.
         pareto_front_programs: Pareto front mapping.
 
     Returns:
@@ -171,7 +171,7 @@ def candidate_tree_dot(state: GEPAState[Any, Any, Any]) -> str:
     return candidate_tree_dot_from_data(
         candidates=state.program_candidates,
         parents=state.parent_program_for_candidate,
-        val_scores=state.program_full_scores_val_set,
+        val_scores=state.program_full_acceptance_scores_val_set,
         pareto_front_programs=state.program_at_pareto_front_valset,
     )
 
@@ -181,7 +181,7 @@ def candidate_tree_html(state: GEPAState[Any, Any, Any]) -> str:
     return candidate_tree_html_from_data(
         candidates=state.program_candidates,
         parents=state.parent_program_for_candidate,
-        val_scores=state.program_full_scores_val_set,
+        val_scores=state.program_full_acceptance_scores_val_set,
         pareto_front_programs=state.program_at_pareto_front_valset,
     )
 
@@ -265,7 +265,7 @@ function renderTooltip(idx) {
   }
 
   return '<div class="tt-header">Candidate ' + n.idx + roleBadge + '</div>' +
-    '<div class="tt-meta">Score: <strong>' + n.score + '</strong>&nbsp;&nbsp;|&nbsp;&nbsp;Parent(s): ' + n.parents +
+    '<div class="tt-meta">Acceptance score: <strong>' + n.score + '</strong>&nbsp;&nbsp;|&nbsp;&nbsp;Parent(s): ' + n.parents +
     '</div><div class="tt-hint">' + (pinnedIdx === idx ? 'Click node again to dismiss' : 'Click to pin &amp; scroll') + '</div>' +
     comps;
 }

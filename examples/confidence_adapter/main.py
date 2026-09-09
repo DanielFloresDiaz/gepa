@@ -397,7 +397,7 @@ def run_optimization(adapter, trainset, valset, dataset_name, adapter_name, cate
         raise_on_exception=False,
     )
 
-    best_score = result.val_aggregate_scores[result.best_idx]
+    best_score = result.val_acceptance_scores[result.best_idx]
     print(f"  Best val_score={best_score:.4f}, candidates={len(result.candidates)}")
 
     info = {
@@ -406,7 +406,7 @@ def run_optimization(adapter, trainset, valset, dataset_name, adapter_name, cate
         "best_val_score": best_score,
         "best_prompt": result.best_candidate["system_prompt"],
         "num_candidates": len(result.candidates),
-        "val_scores_history": result.val_aggregate_scores,
+        "val_scores_history": result.val_acceptance_scores,
     }
     with open(OUTPUT / "optimization" / f"{dataset_name}_{adapter_name}.json", "w") as f:
         json.dump(info, f, indent=2, ensure_ascii=False)

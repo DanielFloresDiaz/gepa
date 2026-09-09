@@ -236,10 +236,11 @@ def _make_state(prog_val_scores, evaluator=None):
         i=0,
         full_program_trace=[{}],
         program_at_pareto_front_valset={0: {1, 2}},
-        program_full_scores_val_set=[0.1, 0.6, 0.7],
+        program_full_acceptance_scores_val_set=[0.1, 0.6, 0.7],
         program_candidates=[{"pred": "base"}, {"pred": "p1"}, {"pred": "p2"}],
         parent_program_for_candidate=[[None], [0], [0]],
-        prog_candidate_val_subscores=prog_val_scores,
+        prog_candidate_per_example_scores=prog_val_scores,
+        prog_candidate_per_example_acceptance_scores=prog_val_scores,
         total_num_evals=0,
         evaluation_cache=None,  # No cache for tests
     )

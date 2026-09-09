@@ -16,8 +16,9 @@ def common_mocks():
     mock_run_return = Mock(
         program_candidates=[{"test": "value"}],
         parent_program_for_candidate=[None],
-        program_full_scores_val_set=[0.5],
-        prog_candidate_val_subscores=[{}],
+        program_full_acceptance_scores_val_set=[0.5],
+        prog_candidate_per_example_scores=[{}],
+        prog_candidate_per_example_acceptance_scores=[{}],
         program_at_pareto_front_valset={0: {}},
         num_metric_calls_by_discovery=[1],
         prog_candidate_objective_scores=[{}],
@@ -46,23 +47,20 @@ def base_optimize_kwargs(common_mocks):
 
 @patch("gepa.api.GEPAEngine.run")
 @patch("gepa.api.ReflectiveMutationProposer")
-def test_module_selector_default_round_robin(mock_proposer, mock_run, common_mocks):
-    """Test that module_selector defaults to round robin."""
+def test_component_selector_default_round_robin(mock_proposer, mock_run, common_mocks):
+    """Test that component_selector defaults to round robin."""
     mock_run_return, mock_adapter = common_mocks
     mock_run.return_value = mock_run_return
 
-    # Create mock data instances
     mock_data = [Mock() for _ in range(3)]
     result = optimize(
         seed_candidate={"test": "value"},
         trainset=mock_data,
         adapter=mock_adapter,
         reflection_lm=lambda x: "test response",
-        # Use default module_selector
         max_metric_calls=1,
     )
 
-    # Verify that ReflectiveMutationProposer was called with RoundRobinReflectionComponentSelector
     mock_proposer.assert_called_once()
     call_args = mock_proposer.call_args
     module_selector = call_args.kwargs["module_selector"]
@@ -72,23 +70,21 @@ def test_module_selector_default_round_robin(mock_proposer, mock_run, common_moc
 
 @patch("gepa.api.GEPAEngine.run")
 @patch("gepa.api.ReflectiveMutationProposer")
-def test_module_selector_string_round_robin(mock_proposer, mock_run, common_mocks):
-    """Test that module_selector='round_robin' works with optimize()."""
+def test_component_selector_string_round_robin(mock_proposer, mock_run, common_mocks):
+    """Test that component_selector='round_robin' works with optimize()."""
     mock_run_return, mock_adapter = common_mocks
     mock_run.return_value = mock_run_return
 
-    # Create mock data instances
     mock_data = [Mock() for _ in range(3)]
     result = optimize(
         seed_candidate={"test": "value"},
         trainset=mock_data,
         adapter=mock_adapter,
         reflection_lm=lambda x: "test response",
-        module_selector="round_robin",
+        component_selector="round_robin",
         max_metric_calls=1,
     )
 
-    # Verify that ReflectiveMutationProposer was called with RoundRobinReflectionComponentSelector
     mock_proposer.assert_called_once()
     call_args = mock_proposer.call_args
     module_selector = call_args.kwargs["module_selector"]
@@ -98,23 +94,21 @@ def test_module_selector_string_round_robin(mock_proposer, mock_run, common_mock
 
 @patch("gepa.api.GEPAEngine.run")
 @patch("gepa.api.ReflectiveMutationProposer")
-def test_module_selector_string_all(mock_proposer, mock_run, common_mocks):
-    """Test that module_selector='all' works with optimize()."""
+def test_component_selector_string_all(mock_proposer, mock_run, common_mocks):
+    """Test that component_selector='all' works with optimize()."""
     mock_run_return, mock_adapter = common_mocks
     mock_run.return_value = mock_run_return
 
-    # Create mock data instances to avoid empty trainset concern
     mock_data = [Mock() for _ in range(3)]
     result = optimize(
         seed_candidate={"test": "value"},
         trainset=mock_data,
         adapter=mock_adapter,
         reflection_lm=lambda x: "test response",
-        module_selector="all",
+        component_selector="all",
         max_metric_calls=1,
     )
 
-    # Verify that ReflectiveMutationProposer was called with AllReflectionComponentSelector
     mock_proposer.assert_called_once()
     call_args = mock_proposer.call_args
     module_selector = call_args.kwargs["module_selector"]
@@ -124,8 +118,8 @@ def test_module_selector_string_all(mock_proposer, mock_run, common_mocks):
 
 @patch("gepa.api.GEPAEngine.run")
 @patch("gepa.api.ReflectiveMutationProposer")
-def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
-    """Test that module_selector accepts custom instances with optimize()."""
+def test_component_selector_custom_instance(mock_proposer, mock_run, common_mocks):
+    """Test that component_selector accepts custom instances with optimize()."""
     mock_run_return, mock_adapter = common_mocks
     mock_run.return_value = mock_run_return
 
@@ -134,18 +128,16 @@ def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
 
     custom_selector = custom_component_selector
 
-    # Create mock data instances
     mock_data = [Mock() for _ in range(3)]
     result = optimize(
         seed_candidate={"test": "value"},
         trainset=mock_data,
         adapter=mock_adapter,
         reflection_lm=lambda x: "test response",
-        module_selector=custom_selector,
+        component_selector=custom_selector,
         max_metric_calls=1,
     )
 
-    # Verify that ReflectiveMutationProposer was called with our custom selector
     mock_proposer.assert_called_once()
     call_args = mock_proposer.call_args
     module_selector = call_args.kwargs["module_selector"]
@@ -153,13 +145,35 @@ def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
     assert result is not None
 
 
+@patch("gepa.api.GEPAEngine.run")
+@patch("gepa.api.ReflectiveMutationProposer")
+def test_module_selector_deprecated_alias(mock_proposer, mock_run, common_mocks):
+    """Deprecated module_selector alias still resolves to the same selector."""
+    mock_run_return, mock_adapter = common_mocks
+    mock_run.return_value = mock_run_return
+
+    mock_data = [Mock() for _ in range(3)]
+    with pytest.warns(DeprecationWarning, match="module_selector is deprecated"):
+        result = optimize(
+            seed_candidate={"test": "value"},
+            trainset=mock_data,
+            adapter=mock_adapter,
+            reflection_lm=lambda x: "test response",
+            module_selector="all",
+            max_metric_calls=1,
+        )
+
+    mock_proposer.assert_called_once()
+    module_selector = mock_proposer.call_args.kwargs["module_selector"]
+    assert isinstance(module_selector, AllReflectionComponentSelector)
+    assert result is not None
+
+
 def test_all_reflection_component_selector_behavior():
     """Test that AllReflectionComponentSelector returns all component names from candidate."""
 
-    # Create a mock state (not used in the new implementation)
     mock_state = Mock()
 
-    # Call selector class instance directly - should return all components from candidate
     selector = AllReflectionComponentSelector()
     candidate = {"component1": "value1", "component2": "value2", "component3": "value3"}
     result = selector(
@@ -174,20 +188,19 @@ def test_all_reflection_component_selector_behavior():
     assert len(result) == 3
 
 
-def test_module_selector_invalid_string_raises_error(common_mocks):
-    """Test that invalid module_selector string raises AssertionError."""
+def test_component_selector_invalid_string_raises_error(common_mocks):
+    """Test that invalid component_selector string raises AssertionError."""
     _, mock_adapter = common_mocks
 
-    # Create mock data instances
     mock_data = [Mock() for _ in range(3)]
 
-    with pytest.raises(AssertionError, match="Unknown module_selector strategy"):
+    with pytest.raises(AssertionError, match="Unknown component_selector strategy"):
         optimize(
             seed_candidate={"test": "value"},
             trainset=mock_data,
             adapter=mock_adapter,
             reflection_lm=lambda x: "test response",
-            module_selector="invalid_strategy",
+            component_selector="invalid_strategy",
             max_metric_calls=1,
         )
 
@@ -199,27 +212,23 @@ def test_batch_sampler_configuration(mock_proposer, mock_run, common_mocks, base
     mock_run_return, _ = common_mocks
     mock_run.return_value = mock_run_return
 
-    # Test 1: Default behavior (defaults to minibatch_size=3)
     optimize(**base_optimize_kwargs)
     sampler = mock_proposer.call_args.kwargs["batch_sampler"]
     assert isinstance(sampler, EpochShuffledBatchSampler)
     assert sampler.minibatch_size == 3
 
-    # Test 2: Using reflection_minibatch_size parameter
     mock_proposer.reset_mock()
     optimize(**base_optimize_kwargs, reflection_minibatch_size=7)
     sampler = mock_proposer.call_args.kwargs["batch_sampler"]
     assert isinstance(sampler, EpochShuffledBatchSampler)
     assert sampler.minibatch_size == 7
 
-    # Test 3: Explicit string 'epoch_shuffled' with custom minibatch_size
     mock_proposer.reset_mock()
     optimize(**base_optimize_kwargs, batch_sampler="epoch_shuffled", reflection_minibatch_size=5)
     sampler = mock_proposer.call_args.kwargs["batch_sampler"]
     assert isinstance(sampler, EpochShuffledBatchSampler)
     assert sampler.minibatch_size == 5
 
-    # Test 4: Custom BatchSampler instance
     mock_proposer.reset_mock()
     custom_batch_sampler = EpochShuffledBatchSampler(minibatch_size=10)
     optimize(**base_optimize_kwargs, batch_sampler=custom_batch_sampler)

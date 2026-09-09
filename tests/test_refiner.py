@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from gepa.optimize_anything import (
-    DEFAULT_REFINER_PROMPT,
     EngineConfig,
     GEPAConfig,
     RefinerConfig,
@@ -146,7 +145,7 @@ class TestRefiner:
             f"\n[Refiner no cache] Metric calls: {result.total_metric_calls}, Actual fitness calls: {call_counter['count']}"
         )
         print(f"Best candidate: {result.best_candidate}")
-        print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+        print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
 
     def test_refiner_with_memory_cache(self):
         """Test refiner works with memory caching."""
@@ -180,7 +179,7 @@ class TestRefiner:
             f"\n[Refiner + memory cache] Metric calls: {result.total_metric_calls}, Actual fitness calls: {call_counter['count']}"
         )
         print(f"Best candidate: {result.best_candidate}")
-        print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+        print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
 
     def test_refiner_with_disk_cache(self):
         """Test refiner works with disk caching."""
@@ -216,7 +215,7 @@ class TestRefiner:
                 f"\n[Refiner + disk cache] Metric calls: {result.total_metric_calls}, Actual fitness calls: {call_counter['count']}"
             )
             print(f"Best candidate: {result.best_candidate}")
-            print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+            print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
 
             # Verify cache files created
             cache_dir = Path(tmp_dir) / "fitness_cache"
@@ -345,7 +344,7 @@ class TestRefiner:
         assert "param_a" in result.best_candidate
         assert "param_b" in result.best_candidate
         print(f"\n[Multi-param] Best candidate: {result.best_candidate}")
-        print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+        print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
 
     def test_side_info_structure(self):
         """Test that side_info has user's structure with refiner_prompt_specific_info added.
@@ -543,7 +542,6 @@ class TestRefiner:
             f"Final score ({score}) must be >= original ({original_score}) — the refiner should never make things worse"
         )
 
-
     def test_refiner_fallback_scores_when_all_refinements_fail(self):
         """When all refinement attempts fail (e.g. JSON parse errors), best_refined_scores
         should fall back to the original evaluation's scores, not remain empty.
@@ -589,9 +587,7 @@ class TestRefiner:
             "refiner_prompt": "Improve the guess. Return a JSON dict with 'number'.",
         }
 
-        score, output, side_info = adapter._evaluate_single_with_refinement(
-            candidate, _SINGLE_INSTANCE_SENTINEL
-        )
+        score, output, side_info = adapter._evaluate_single_with_refinement(candidate, _SINGLE_INSTANCE_SENTINEL)
 
         refiner_info = side_info["refiner_prompt_specific_info"]
 
@@ -639,7 +635,7 @@ class TestRefinerWithDataset:
 
         assert result is not None
         assert "refiner_prompt" in result.best_candidate
-        best_score = result.val_aggregate_scores[result.best_idx]
+        best_score = result.val_acceptance_scores[result.best_idx]
         print(f"\n[Single-instance] Best: {result.best_candidate['number']}, Score: {best_score}")
         print(f"Metric calls: {result.total_metric_calls}, Fitness calls: {call_counter['count']}")
 
@@ -669,7 +665,7 @@ class TestRefinerWithDataset:
 
         assert result is not None
         assert "refiner_prompt" in result.best_candidate
-        best_score = result.val_aggregate_scores[result.best_idx]
+        best_score = result.val_acceptance_scores[result.best_idx]
         print(f"\n[Dataset mode] Best: {result.best_candidate['number']}, Score: {best_score}")
         print(f"Metric calls: {result.total_metric_calls}, Fitness calls: {call_counter['count']}")
 
@@ -705,7 +701,7 @@ class TestRefinerFrontierTypes:
 
         assert result is not None
         assert "refiner_prompt" in result.best_candidate
-        best_score = result.val_aggregate_scores[result.best_idx]
+        best_score = result.val_acceptance_scores[result.best_idx]
         print(f"\n[{frontier_type}] Best: {result.best_candidate['number']}, Score: {best_score}")
         print(f"Metric calls: {result.total_metric_calls}, Fitness calls: {call_counter['count']}")
 
@@ -768,7 +764,7 @@ class TestRefinerFrontierTypes:
         assert len(eval_batch.objective_scores) == len(DATASET)
 
         for i, (score, side_info, obj_scores) in enumerate(
-            zip(eval_batch.scores, eval_batch.trajectories, eval_batch.objective_scores)
+            zip(eval_batch.scores, eval_batch.trajectories, eval_batch.objective_scores, strict=False)
         ):
             print(f"\n[{frontier_type}] Example {i} (golden={DATASET[i]['golden']}):")
             print(f"  Score: {score}")
@@ -827,6 +823,6 @@ if __name__ == "__main__":
     )
 
     print(f"\nBest candidate: {result.best_candidate}")
-    print(f"Best score: {result.val_aggregate_scores[result.best_idx]}")
+    print(f"Best score: {result.val_acceptance_scores[result.best_idx]}")
     print(f"Total metric calls: {result.total_metric_calls}")
     print(f"Actual fitness_fn calls: {call_counter['count']}")

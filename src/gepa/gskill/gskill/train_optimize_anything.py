@@ -739,7 +739,7 @@ def main():
 
     # Get best score from result
     best_idx = result.best_idx
-    best_score = result.val_aggregate_scores[best_idx] if result.val_aggregate_scores else 0.0
+    best_score = result.val_acceptance_scores[best_idx] if result.val_acceptance_scores else 0.0
     num_candidates = result.num_candidates
 
     print(f"\nBest Prompt (Score: {best_score:.2%}):")

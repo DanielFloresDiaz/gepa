@@ -168,7 +168,7 @@ def test_empty_seed_candidate():
         return "```\nimproved instructions\n```"
 
     # Test with empty dict
-    with pytest.raises(ValueError, match=r"seed_candidate must contain at least one component text\."):
+    with pytest.raises(ValueError, match=r"seed_candidate must contain at least one component value\."):
         optimize(
             seed_candidate={},
             trainset=mock_data,
@@ -196,7 +196,7 @@ def test_none_seed_candidate():
         return "```\nimproved instructions\n```"
 
     # Test with None - Note: this will be caught by type checker, but we test runtime behavior
-    with pytest.raises(ValueError, match=r"seed_candidate must contain at least one component text\."):
+    with pytest.raises(ValueError, match=r"seed_candidate must contain at least one component value\."):
         optimize(
             seed_candidate=None,  # type: ignore
             trainset=mock_data,

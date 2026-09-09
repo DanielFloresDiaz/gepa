@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 #replace_package_name_marker
 name="gepa"
 #replace_package_version_marker
-version="0.1.1"
+version="0.2.0"
 description = "A framework for optimizing textual system components (AI prompts, code snippets, etc.) using LLM-based reflection and Pareto-efficient evolutionary search."
 readme = "README.md"
 authors = [
@@ -65,7 +65,9 @@ dev = [
     "gepa[build]",
     "pre-commit",
     "build>=1.0.3",
-    "ruff>=0.3.0"
+    "ruff>=0.3.0",
+    "coverage>=7.6.0",
+    "diff-cover>=9.2.0",
 ]
 gskill = [
     "gepa[full]",
@@ -79,6 +81,13 @@ gskill = [
 "Homepage" = "https://github.com/gepa-ai/gepa"
 "Bug Tracker" = "https://github.com/gepa-ai/gepa/issues"
 
+[dependency-groups]
+lint = [
+    "pre-commit>=4.5.0",
+    "pyright>=1.1.388",
+    "ruff>=0.6.9",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -87,9 +96,45 @@ gepa = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "unit: fast unit tests with no external dependencies",
+    "integration: tests that exercise multiple components together",
+    "slow: tests that take a long time to run",
+    "requires_llm: tests that require an LLM API or local model",
+    "llm_call: tests that make real LLM API calls",
+]
+
+[tool.coverage.run]
+source = ["src/gepa"]
+omit = [
+    "*/__init__.py",
+    "src/gepa/adapters/dspy_adapter/*",
+    "src/gepa/adapters/dspy_full_program_adapter/*",
+    "src/gepa/adapters/generic_rag_adapter/*",
+    "src/gepa/adapters/anymaths_adapter/*",
+    "src/gepa/adapters/terminal_bench_adapter/*",
+    "src/gepa/adapters/confidence_adapter/*",
+    "src/gepa/examples/*",
+    "src/gepa/gskill/*",
+]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+ignore_errors = true
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "@overload",
+    "@typing.overload",
+    "@abstractmethod",
+]
 
 [tool.ruff]
-include = ["src/**/*.py"]
+include = ["src/**/*.py", "tests/**/*.py"]
 line-length = 120
 indent-width = 4
 target-version = "py310"
@@ -144,7 +189,19 @@ ban-relative-imports = "all"
     "S101",    # Allow assert statements in tests
     "TID252",  # Allow relative imports in tests
     "ARG001",  # Allow unused arguments in tests (like pytest fixtures)
+    "F401",    # Import availability checks in tests
+    "F841",    # Unused variables in tests
+    "B011",    # assert False in import tests
+    "E402",    # Imports after setup in tests
+    "E712",    # Explicit bool comparisons in tests
+    "N802",    # Non-lowercase test function names
+    "N806",    # Uppercase variables in tests
+    "UP038",   # isinstance tuple style in tests
+    "RUF013",  # Implicit Optional in test mocks
+    "RUF024",  # dict.fromkeys with mutable values in tests
+    "C414",    # sorted(list(...)) in tests
 ]
+"src/gepa/api.py" = ["E402"]  # _UNSET sentinel before imports
 "__init__.py" = ["F401"]  # Init files can be empty
 "src/gepa/gskill/**/*.py" = ["E402"]  # gskill suppresses logging before imports
 "examples/**/*.py" = ["E402"]  # Jupyter-notebook-style scripts import mid-file

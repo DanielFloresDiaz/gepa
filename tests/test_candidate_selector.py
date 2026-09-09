@@ -29,13 +29,21 @@ def mock_state():
     state.program_candidates.append({"system_prompt": "test2"})
     state.program_candidates.append({"system_prompt": "test3"})
 
-    # prog_candidate_val_subscores should be dicts, not lists
-    state.prog_candidate_val_subscores.append({0: 0.6, 1: 0.6, 2: 0.6})
-    state.prog_candidate_val_subscores.append({0: 0.8, 1: 0.8, 2: 0.8})
+    # prog_candidate_per_example_scores should be dicts, not lists
+    state.prog_candidate_per_example_scores.append({0: 0.6, 1: 0.6, 2: 0.6})
+    state.prog_candidate_per_example_scores.append({0: 0.8, 1: 0.8, 2: 0.8})
 
     # Add entries to prog_candidate_objective_scores to maintain consistency
     state.prog_candidate_objective_scores.append({})
     state.prog_candidate_objective_scores.append({})
+    state.prog_candidate_objective_subscores.append(None)
+    state.prog_candidate_objective_subscores.append(None)
+
+    # 1-centered acceptance scores preserving raw-mean ranking: 0.5, 0.6, 0.8
+    state.prog_candidate_acceptance_scores.append(1.1)
+    state.prog_candidate_acceptance_scores.append(1.3)
+    state.prog_candidate_per_example_acceptance_scores.append({0: 1.1, 1: 1.1, 2: 1.1})
+    state.prog_candidate_per_example_acceptance_scores.append({0: 1.3, 1: 1.3, 2: 1.3})
 
     state.parent_program_for_candidate.append([0])
     state.parent_program_for_candidate.append([1])
@@ -59,10 +67,10 @@ class TestCurrentBestCandidateSelector:
         """Test that CurrentBestCandidateSelector always selects the candidate with highest score."""
         selector = CurrentBestCandidateSelector()
 
-        # Best candidate is at index 2 with score 0.8
+        # Best candidate is at index 2
         selected_idx = selector.select_candidate_idx(mock_state)
         assert selected_idx == 2
-        assert mock_state.program_full_scores_val_set[selected_idx] == pytest.approx(0.8)
+        assert mock_state.program_full_acceptance_scores_val_set[selected_idx] == pytest.approx(1.3)
 
     def test_deterministic(self, mock_state):
         """Test that CurrentBestCandidateSelector is deterministic."""

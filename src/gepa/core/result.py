@@ -20,11 +20,15 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
         best_candidate: The optimized parameter(s) — ``dict[str, CandidateT]`` or plain
             ``CandidateT`` when ``seed_candidate`` was a CandidateT.
         best_idx: Index of the highest-scoring candidate.
-        val_aggregate_scores: Per-candidate average validation score (higher is better).
+        val_acceptance_scores: Per-candidate acceptance score used for ranking
+            (seed is 1.0; later candidates are mean parent acceptance +
+            mean of per-example criterion improvement). Raw per-example metric scores are in
+            ``val_per_example_scores``; per-example acceptance scores are in
+            ``val_per_example_acceptance_scores``.
         candidates: All candidates explored during optimization.
         parents: Lineage — ``parents[i]`` is a list of parent indices for candidate ``i``.
         per_val_instance_best_candidates: Pareto frontier — per validation example,
-            the set of candidate indices achieving the best score.
+            the set of candidate indices achieving the best per-example acceptance score.
         best_refiner_prompt: The refiner prompt from the best candidate (if refiner was enabled).
 
     Serialization:
@@ -34,14 +38,15 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
 
         result = optimize_anything(...)
         print(result.best_candidate)
-        print(result.val_aggregate_scores[result.best_idx])
+        print(result.val_acceptance_scores[result.best_idx])
     """
 
     # Core data
     candidates: list[dict[str, CandidateT]]
     parents: list[list[ProgramIdx | None]]
-    val_aggregate_scores: list[float]
-    val_subscores: list[dict[DataId, float]]
+    val_acceptance_scores: list[float]
+    val_per_example_scores: list[dict[DataId, float]]
+    val_per_example_acceptance_scores: list[dict[DataId, float]]
     per_val_instance_best_candidates: dict[DataId, set[ProgramIdx]]
     discovery_eval_counts: list[int]
     val_aggregate_subscores: list[dict[str, float]] | None = None
@@ -61,7 +66,7 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
     # This is the internal dict key used to wrap str seed_candidates.
     _str_candidate_key: str | None = None
 
-    _VALIDATION_SCHEMA_VERSION: ClassVar[int] = 2
+    _VALIDATION_SCHEMA_VERSION: ClassVar[int] = 3
 
     # -------- Convenience properties --------
     @property
@@ -74,7 +79,7 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
 
     @property
     def best_idx(self) -> int:
-        scores = self.val_aggregate_scores
+        scores = self.val_acceptance_scores
         return max(range(len(scores)), key=lambda i: scores[i])
 
     @property
@@ -103,7 +108,7 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
         return candidate_tree_dot_from_data(
             candidates=self.candidates,
             parents=self.parents,
-            val_scores=self.val_aggregate_scores,
+            val_scores=self.val_acceptance_scores,
             pareto_front_programs=self.per_val_instance_best_candidates,
         )
 
@@ -114,7 +119,7 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
         return candidate_tree_html_from_data(
             candidates=self.candidates,
             parents=self.parents,
-            val_scores=self.val_aggregate_scores,
+            val_scores=self.val_acceptance_scores,
             pareto_front_programs=self.per_val_instance_best_candidates,
         )
 
@@ -124,8 +129,9 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
         return {
             "candidates": cands,
             "parents": self.parents,
-            "val_aggregate_scores": self.val_aggregate_scores,
-            "val_subscores": self.val_subscores,
+            "val_acceptance_scores": self.val_acceptance_scores,
+            "val_per_example_scores": self.val_per_example_scores,
+            "val_per_example_acceptance_scores": self.val_per_example_acceptance_scores,
             "best_outputs_valset": self.best_outputs_valset,
             "per_val_instance_best_candidates": {
                 val_id: list(front) for val_id, front in self.per_val_instance_best_candidates.items()
@@ -159,14 +165,18 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
         if version <= 1:
             return GEPAResult[RolloutOutput, DataId, CandidateT]._migrate_from_dict_v0(d)
 
-        return GEPAResult[RolloutOutput, DataId, CandidateT]._from_dict_v2(d)
+        if version == 2:
+            return GEPAResult[RolloutOutput, DataId, CandidateT]._from_dict_v2(d)
+
+        return GEPAResult[RolloutOutput, DataId, CandidateT]._from_dict_v3(d)
 
     @staticmethod
     def _common_kwargs_from_dict(d: dict[str, Any]) -> dict[str, Any]:
+        acceptance_scores = d.get("val_acceptance_scores", d.get("val_aggregate_scores", []))
         return {
             "candidates": [dict(candidate) for candidate in d.get("candidates", [])],
             "parents": [list(parent_row) for parent_row in d.get("parents", [])],
-            "val_aggregate_scores": list(d.get("val_aggregate_scores", [])),
+            "val_acceptance_scores": list(acceptance_scores),
             "discovery_eval_counts": list(d.get("discovery_eval_counts", [])),
             "total_metric_calls": d.get("total_metric_calls"),
             "num_full_val_evals": d.get("num_full_val_evals"),
@@ -176,9 +186,25 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
         }
 
     @staticmethod
+    def _per_example_acceptance_from_raw(
+        per_example_scores: list[dict[Any, float]],
+        stored: list[dict[Any, float]] | None,
+    ) -> list[dict[Any, float]]:
+        if stored is not None:
+            return [dict(scores) for scores in stored]
+        from gepa.core.state import GEPAState
+
+        _, acc_subs = GEPAState._acceptance_scores_from_raw_subscores(per_example_scores)
+        return acc_subs
+
+    @staticmethod
     def _migrate_from_dict_v0(d: dict[str, Any]) -> "GEPAResult[RolloutOutput, DataId, CandidateT]":
         kwargs = GEPAResult._common_kwargs_from_dict(d)
-        kwargs["val_subscores"] = [dict(enumerate(scores)) for scores in d.get("val_subscores", [])]
+        per_example_scores = [dict(enumerate(scores)) for scores in d.get("val_subscores", [])]
+        kwargs["val_per_example_scores"] = per_example_scores
+        kwargs["val_per_example_acceptance_scores"] = GEPAResult._per_example_acceptance_from_raw(
+            per_example_scores, None
+        )
         kwargs["per_val_instance_best_candidates"] = {
             idx: set(front) for idx, front in enumerate(d.get("per_val_instance_best_candidates", []))
         }
@@ -194,9 +220,33 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
         return GEPAResult(**kwargs)
 
     @staticmethod
+    def _objective_kwargs_from_dict(d: dict[str, Any]) -> dict[str, Any]:
+        val_aggregate_subscores = d.get("val_aggregate_subscores")
+        per_objective_best_candidates = d.get("per_objective_best_candidates")
+        objective_pareto_front = d.get("objective_pareto_front")
+        return {
+            "val_aggregate_subscores": (
+                [dict(scores) for scores in val_aggregate_subscores] if val_aggregate_subscores is not None else None
+            ),
+            "per_objective_best_candidates": (
+                {
+                    objective: set(program_indices)
+                    for objective, program_indices in per_objective_best_candidates.items()
+                }
+                if per_objective_best_candidates is not None
+                else None
+            ),
+            "objective_pareto_front": dict(objective_pareto_front) if objective_pareto_front is not None else None,
+        }
+
+    @staticmethod
     def _from_dict_v2(d: dict[str, Any]) -> "GEPAResult[RolloutOutput, DataId, CandidateT]":
         kwargs = GEPAResult._common_kwargs_from_dict(d)
-        kwargs["val_subscores"] = [dict(scores) for scores in d.get("val_subscores", [])]
+        per_example_scores = [dict(scores) for scores in d.get("val_subscores", [])]
+        kwargs["val_per_example_scores"] = per_example_scores
+        kwargs["val_per_example_acceptance_scores"] = GEPAResult._per_example_acceptance_from_raw(
+            per_example_scores, d.get("val_per_example_acceptance_scores")
+        )
         per_val_instance_best_candidates_data = d.get("per_val_instance_best_candidates", {})
         kwargs["per_val_instance_best_candidates"] = {
             val_id: set(candidates_on_front)
@@ -212,22 +262,33 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
         else:
             kwargs["best_outputs_valset"] = None
 
-        val_aggregate_subscores = d.get("val_aggregate_subscores")
-        kwargs["val_aggregate_subscores"] = (
-            [dict(scores) for scores in val_aggregate_subscores] if val_aggregate_subscores is not None else None
-        )
+        kwargs.update(GEPAResult._objective_kwargs_from_dict(d))
+        return GEPAResult(**kwargs)
 
-        per_objective_best_candidates = d.get("per_objective_best_candidates")
-        if per_objective_best_candidates is not None:
-            kwargs["per_objective_best_candidates"] = {
-                objective: set(program_indices) for objective, program_indices in per_objective_best_candidates.items()
+    @staticmethod
+    def _from_dict_v3(d: dict[str, Any]) -> "GEPAResult[RolloutOutput, DataId, CandidateT]":
+        kwargs = GEPAResult._common_kwargs_from_dict(d)
+        per_example_scores = [dict(scores) for scores in d.get("val_per_example_scores", d.get("val_subscores", []))]
+        kwargs["val_per_example_scores"] = per_example_scores
+        kwargs["val_per_example_acceptance_scores"] = GEPAResult._per_example_acceptance_from_raw(
+            per_example_scores, d.get("val_per_example_acceptance_scores")
+        )
+        per_val_instance_best_candidates_data = d.get("per_val_instance_best_candidates", {})
+        kwargs["per_val_instance_best_candidates"] = {
+            val_id: set(candidates_on_front)
+            for val_id, candidates_on_front in per_val_instance_best_candidates_data.items()
+        }
+
+        best_outputs_valset = d.get("best_outputs_valset")
+        if best_outputs_valset is not None:
+            kwargs["best_outputs_valset"] = {
+                val_id: [(program_idx, output) for program_idx, output in outputs]
+                for val_id, outputs in best_outputs_valset.items()
             }
         else:
-            kwargs["per_objective_best_candidates"] = None
+            kwargs["best_outputs_valset"] = None
 
-        objective_pareto_front = d.get("objective_pareto_front")
-        kwargs["objective_pareto_front"] = dict(objective_pareto_front) if objective_pareto_front is not None else None
-
+        kwargs.update(GEPAResult._objective_kwargs_from_dict(d))
         return GEPAResult(**kwargs)
 
     @staticmethod
@@ -253,9 +314,12 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
         return GEPAResult[RolloutOutput, DataId, CandidateT](
             candidates=list(state.program_candidates),
             parents=list(state.parent_program_for_candidate),
-            val_aggregate_scores=list(state.program_full_scores_val_set),
+            val_acceptance_scores=list(state.program_full_acceptance_scores_val_set),
             best_outputs_valset=getattr(state, "best_outputs_valset", None),
-            val_subscores=[dict(scores) for scores in state.prog_candidate_val_subscores],
+            val_per_example_scores=[dict(scores) for scores in state.prog_candidate_per_example_scores],
+            val_per_example_acceptance_scores=[
+                dict(scores) for scores in state.prog_candidate_per_example_acceptance_scores
+            ],
             per_val_instance_best_candidates={
                 val_id: set(front) for val_id, front in state.program_at_pareto_front_valset.items()
             },

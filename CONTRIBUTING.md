@@ -7,99 +7,72 @@ If you are not familiar with the GitHub fork process, please refer to [Fork a re
 it to your local development device:
 
 ```shell
-git clone https://github.com/gepa-ai/gepa
+git clone https://github.com/DanielFloresDiaz/gepa
 cd gepa
 ```
 
-Next, we must set up a Python environment with the correct dependencies. There are two recommended ways to set up the
-dev environment.
-
-### [Recommended] Set Up Environment Using uv
-
-[uv](https://github.com/astral-sh/uv) is a rust-based Python package and project manager that provides a fast
-way to set up the development environment. First, install uv by following the
-[installation guide](https://docs.astral.sh/uv/getting-started/installation/).
-
-After uv is installed, in your working directory (`gepa/`), run:
+Next, set up a Python environment with the correct dependencies using [uv](https://github.com/astral-sh/uv):
 
 ```shell
-uv sync --extra dev --python 3.11
+make install
 ```
 
-Then you are all set!
+This installs all dependencies, the lint tooling group, and pre-commit hooks.
 
-To verify that your environment is set up successfully, run some unit tests:
+To verify that your environment is set up successfully, run the test suite:
 
 ```shell
-uv run pytest tests/
+make test
 ```
 
-Note: You need to use the `uv run` prefix for every Python command, as uv creates a Python virtual
-environment and `uv run` points the command to that environment. For example, to execute a Python script you will need
-`uv run python script.py`.
+## Branch Strategy
 
-### Set Up Environment Using conda + pip
+GEPA uses a **develop → main** workflow:
 
-You can also set up the virtual environment via conda + pip, which takes a few extra steps but offers more flexibility. Before starting,
-make sure you have conda installed. If not, please follow the instructions
-[here](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html).
+- **`develop`** — integration branch; feature PRs target here
+- **`main`** — release branch; merge `develop` into `main` when cutting a release
+- Release tags (e.g. `v0.1.2`) are pushed from `main` and trigger the release workflow
 
-To set up the environment, run:
+## Development Commands
 
-```shell
-conda create -n gepa-dev python=3.11
-conda activate gepa-dev
-pip install -e ".[dev]"
-```
+All commands run from the `gepa/` directory:
 
-Then verify the installation by running some unit tests:
-
-```shell
-pytest tests/
-```
+| Command | Description |
+|---------|-------------|
+| `make install` | Install dependencies and pre-commit hooks |
+| `make sync` | Update packages from `uv.lock` |
+| `make format` | Auto-format code with ruff |
+| `make lint` | Check formatting and lint rules |
+| `make typecheck` | Run pyright static type checking |
+| `make test` | Run pytest with coverage collection |
+| `make testcov` | Run tests and generate HTML/XML coverage reports |
+| `make pre-commit` | Run all pre-commit hooks on all files |
+| `make all` | Run format, lint, typecheck, and testcov |
+| `make clean` | Remove build artifacts and caches |
+| `make help` | Show all available targets |
 
 ## Code Linting with Ruff
-We follow the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html) and use `ruff` for both linting and formatting. To ensure consistent code quality, we use pre-commit hooks that automatically check and fix common issues.
 
-
-First you need to set up the pre-commit hooks (do this once after cloning the repository):
+We follow the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html) and use `ruff` for both linting and formatting. Pre-commit hooks automatically run `make format` and `make lint` on commit.
 
 ```shell
-uv run pre-commit install
+make pre-commit
 ```
 
-Then stage and commit your changes. When you run `git commit`, the pre-commit hook will be
-automatically run.
+Or run hooks on staged files only:
 
 ```shell
-git add .
-git commit -m "your commit message"
+pre-commit run
 ```
 
-If the hooks make any changes, you'll need to stage and commit those changes as well.
-
-You can also run the hooks manually:
-
-- Check staged files only:
-
-  ```shell
-  uv run pre-commit run
-  ```
-
-- Check specific files:
-
-  ```shell
-  uv run pre-commit run --files path/to/file1.py path/to/file2.py
-  ```
-
-Please ensure all pre-commit checks pass before creating your pull request. If you're unsure about any
-formatting issues, feel free to commit your changes and let the pre-commit hooks fix them automatically.
+Please ensure all pre-commit checks pass before creating your pull request.
 
 ## Type Checking with Pyright
+
 Run Pyright before opening a pull request to catch type regressions early:
 
 ```shell
-uv run pyright
+make typecheck
 ```
 
 You can target specific modules while iterating:
@@ -107,3 +80,18 @@ You can target specific modules while iterating:
 ```shell
 uv run pyright src/gepa/strategies/
 ```
+
+## Releases
+
+See `.cursor/skills/release/SKILL.md` for the full release workflow. In brief:
+
+1. Merge `develop` → `main`
+2. Bump `pyproject.toml` version and write `changelogs/v<version>.md`
+3. Tag: `git tag v<version>` and `git push origin v<version>`
+4. GitHub Actions builds wheels and publishes a GitHub release
+
+## CI
+
+- **`testing.yaml`** — lint, typecheck, test (Python 3.10–3.14), coverage (70% threshold)
+- **`release.yaml`** — runs tests then publishes GitHub release with wheels on tag push
+- **`docs.yml`** — MkDocs build and GitHub Pages deploy (unchanged)

@@ -241,7 +241,7 @@ def run_local_example(task_model: str = "ollama/llama3.1:8b", reflection_model: 
     logger.info("-" * 60)
     logger.info("Optimization Complete")
     logger.info("=" * 60)
-    best_score = result.val_aggregate_scores[result.best_idx] if result.val_aggregate_scores else 0.0
+    best_score = result.val_acceptance_scores[result.best_idx] if result.val_acceptance_scores else 0.0
     best_candidate = result.candidates[result.best_idx]
     logger.info(f"Best Score: {best_score:.2f}")
     logger.info("")
@@ -309,7 +309,7 @@ def run_remote_example(url: str, task_model: str = "ollama/llama3.1:8b", reflect
     logger.info("-" * 60)
     logger.info("Optimization Complete")
     logger.info("=" * 60)
-    best_score = result.val_aggregate_scores[result.best_idx] if result.val_aggregate_scores else 0.0
+    best_score = result.val_acceptance_scores[result.best_idx] if result.val_acceptance_scores else 0.0
     best_candidate = result.candidates[result.best_idx]
     logger.info(f"Best Score: {best_score:.2f}")
     logger.info("")

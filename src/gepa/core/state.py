@@ -17,6 +17,9 @@ from gepa.logging.logger import LoggerProtocol
 # Types for GEPAState
 ProgramIdx = int
 
+# Seed has nothing to compare to; acceptance ranking is centered at 1.
+SEED_ACCEPTANCE_SCORE: float = 1.0
+
 # Type aliases
 ObjectiveScores: TypeAlias = dict[str, float]
 FrontierType: TypeAlias = Literal["instance", "objective", "hybrid", "cartesian"]
@@ -150,14 +153,17 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
     returned by :func:`~gepa.optimize_anything.optimize_anything`.
     """
 
-    _VALIDATION_SCHEMA_VERSION: ClassVar[int] = 5
+    _VALIDATION_SCHEMA_VERSION: ClassVar[int] = 7
     # Attributes that are runtime-only and should not be serialized (e.g., callback hooks, caches)
     _EXCLUDED_FROM_SERIALIZATION: ClassVar[frozenset[str]] = frozenset({"_budget_hooks"})
 
     program_candidates: list[dict[str, CandidateT]]
     parent_program_for_candidate: list[list[ProgramIdx | None]]
-    prog_candidate_val_subscores: list[dict[DataId, float]]
+    prog_candidate_per_example_scores: list[dict[DataId, float]]
     prog_candidate_objective_scores: list[ObjectiveScores]
+    prog_candidate_objective_subscores: list[dict[DataId, ObjectiveScores] | None]
+    prog_candidate_acceptance_scores: list[float]
+    prog_candidate_per_example_acceptance_scores: list[dict[DataId, float]]
 
     pareto_front_valset: dict[DataId, float]
     program_at_pareto_front_valset: dict[DataId, set[ProgramIdx]]
@@ -197,16 +203,25 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
         evaluation_cache: "EvaluationCache[RolloutOutput, DataId, CandidateT] | None" = None,
     ):
         self.program_candidates = [dict(seed_candidate)]
-        self.prog_candidate_val_subscores = [dict(base_evaluation.scores_by_val_id)]
+        self.prog_candidate_per_example_scores = [dict(base_evaluation.scores_by_val_id)]
 
         base_objective_aggregates = self._aggregate_objective_scores(base_evaluation.objective_scores_by_val_id)
         self.prog_candidate_objective_scores = [base_objective_aggregates]
+        if base_evaluation.objective_scores_by_val_id:
+            self.prog_candidate_objective_subscores = [dict(base_evaluation.objective_scores_by_val_id)]
+        else:
+            self.prog_candidate_objective_subscores = [None]
+
+        seed_val_ids = base_evaluation.scores_by_val_id.keys()
+        self.prog_candidate_acceptance_scores = [SEED_ACCEPTANCE_SCORE]
+        self.prog_candidate_per_example_acceptance_scores = [dict.fromkeys(seed_val_ids, SEED_ACCEPTANCE_SCORE)]
 
         self.parent_program_for_candidate = [[None]]
 
         self.frontier_type: FrontierType = frontier_type
-        self.pareto_front_valset = dict(base_evaluation.scores_by_val_id)
-        self.program_at_pareto_front_valset = {val_id: {0} for val_id in base_evaluation.scores_by_val_id.keys()}
+        # Per-example best acceptance scores (seed is SEED_ACCEPTANCE_SCORE), not raw metric scores.
+        self.pareto_front_valset = dict.fromkeys(seed_val_ids, SEED_ACCEPTANCE_SCORE)
+        self.program_at_pareto_front_valset = {val_id: {0} for val_id in seed_val_ids}
         self.objective_pareto_front = dict(base_objective_aggregates)
         self.program_at_pareto_front_objectives = {objective: {0} for objective in base_objective_aggregates.keys()}
 
@@ -256,8 +271,11 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
     def is_consistent(self) -> bool:
         assert len(self.program_candidates) == len(self.parent_program_for_candidate)
         assert len(self.program_candidates) == len(self.named_predictor_id_to_update_next_for_program_candidate)
-        assert len(self.program_candidates) == len(self.prog_candidate_val_subscores)
+        assert len(self.program_candidates) == len(self.prog_candidate_per_example_scores)
         assert len(self.program_candidates) == len(self.prog_candidate_objective_scores)
+        assert len(self.program_candidates) == len(self.prog_candidate_objective_subscores)
+        assert len(self.program_candidates) == len(self.prog_candidate_acceptance_scores)
+        assert len(self.program_candidates) == len(self.prog_candidate_per_example_acceptance_scores)
         assert len(self.program_candidates) == len(self.num_metric_calls_by_discovery)
 
         assert len(self.pareto_front_valset) == len(self.program_at_pareto_front_valset)
@@ -364,8 +382,11 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
         state.__dict__.update(data)
 
         state.validation_schema_version = GEPAState._VALIDATION_SCHEMA_VERSION
-        assert len(state.program_candidates) == len(state.prog_candidate_val_subscores)
+        assert len(state.program_candidates) == len(state.prog_candidate_per_example_scores)
         assert len(state.program_candidates) == len(state.prog_candidate_objective_scores)
+        assert len(state.program_candidates) == len(state.prog_candidate_objective_subscores)
+        assert len(state.program_candidates) == len(state.prog_candidate_acceptance_scores)
+        assert len(state.program_candidates) == len(state.prog_candidate_per_example_acceptance_scores)
         assert len(state.program_candidates) == len(state.num_metric_calls_by_discovery)
         assert len(state.program_candidates) == len(state.parent_program_for_candidate)
         assert len(state.program_candidates) == len(state.named_predictor_id_to_update_next_for_program_candidate)
@@ -400,6 +421,7 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
 
     @staticmethod
     def _upgrade_state_dict(d: dict[str, Any]) -> None:
+        incoming_version = d.get("validation_schema_version") or 0
         num_candidates = len(d.get("program_candidates", []))
         if "prog_candidate_objective_scores" not in d:
             d["prog_candidate_objective_scores"] = [{} for _ in range(num_candidates)]
@@ -417,7 +439,86 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
             d["evaluation_cache"] = None
         if "adapter_state" not in d:
             d["adapter_state"] = {}
+        if "prog_candidate_objective_subscores" not in d:
+            d["prog_candidate_objective_subscores"] = [None] * num_candidates
+        if incoming_version < 6:
+            raw_frontier = d.pop("use_raw_instance_frontier", True)
+            missing_acceptance = (
+                "prog_candidate_acceptance_scores" not in d or "prog_candidate_acceptance_subscores" not in d
+            )
+            if missing_acceptance:
+                acc_scores, acc_subs = GEPAState._acceptance_scores_from_raw_subscores(
+                    d.get("prog_candidate_val_subscores", [])
+                )
+                d["prog_candidate_acceptance_scores"] = acc_scores
+                d["prog_candidate_acceptance_subscores"] = acc_subs
+                GEPAState._rebuild_instance_front_from_acceptance_subs(d)
+            elif raw_frontier:
+                _, acc_subs = GEPAState._acceptance_scores_from_raw_subscores(d.get("prog_candidate_val_subscores", []))
+                d["prog_candidate_acceptance_subscores"] = acc_subs
+                GEPAState._rebuild_instance_front_from_acceptance_subs(d)
+
+        if "prog_candidate_per_example_scores" not in d and "prog_candidate_val_subscores" in d:
+            d["prog_candidate_per_example_scores"] = d.pop("prog_candidate_val_subscores")
+        else:
+            d.pop("prog_candidate_val_subscores", None)
+        if "prog_candidate_per_example_acceptance_scores" not in d and "prog_candidate_acceptance_subscores" in d:
+            d["prog_candidate_per_example_acceptance_scores"] = d.pop("prog_candidate_acceptance_subscores")
+        else:
+            d.pop("prog_candidate_acceptance_subscores", None)
+
         d["validation_schema_version"] = GEPAState._VALIDATION_SCHEMA_VERSION
+
+    @staticmethod
+    def _mean_of_score_dict(scores: dict[Any, float]) -> float:
+        if not scores:
+            return float("-inf")
+        return sum(scores.values()) / len(scores)
+
+    @staticmethod
+    def _rebuild_instance_front_from_acceptance_subs(d: dict[str, Any]) -> None:
+        """Rebuild instance Pareto membership from per-example acceptance scores."""
+        acc_subs = d.get("prog_candidate_acceptance_subscores") or d.get(
+            "prog_candidate_per_example_acceptance_scores", []
+        )
+        front: dict[Any, float] = {}
+        programs: dict[Any, set[int]] = {}
+        for prog_idx, subs in enumerate(acc_subs):
+            for val_id, score in subs.items():
+                prev = front.get(val_id, float("-inf"))
+                if score > prev:
+                    front[val_id] = score
+                    programs[val_id] = {prog_idx}
+                elif score == prev:
+                    programs.setdefault(val_id, set()).add(prog_idx)
+        d["pareto_front_valset"] = front
+        d["program_at_pareto_front_valset"] = programs
+
+    @staticmethod
+    def _acceptance_scores_from_raw_subscores(
+        per_example_scores: list[dict[Any, float]],
+    ) -> tuple[list[float], list[dict[Any, float]]]:
+        """Rebuild 1-centered per-example acceptance scores from raw val scores."""
+        if not per_example_scores:
+            return [], []
+        seed_raw = per_example_scores[0]
+        acc_scores: list[float] = []
+        acc_subs: list[dict[Any, float]] = []
+        for i, raw in enumerate(per_example_scores):
+            if i == 0:
+                subs = dict.fromkeys(raw, SEED_ACCEPTANCE_SCORE)
+            else:
+                subs = {
+                    val_id: (
+                        SEED_ACCEPTANCE_SCORE + (score - seed_raw[val_id])
+                        if val_id in seed_raw
+                        else SEED_ACCEPTANCE_SCORE
+                    )
+                    for val_id, score in raw.items()
+                }
+            acc_subs.append(subs)
+            acc_scores.append(GEPAState._mean_of_score_dict(subs) if subs else SEED_ACCEPTANCE_SCORE)
+        return acc_scores, acc_subs
 
     @staticmethod
     def _aggregate_objective_scores(
@@ -437,7 +538,7 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
 
     def get_program_average_val_subset(self, program_idx: int) -> tuple[float, int]:
         # TODO: This should be only used/handled by the val_evaluation_policy, and never used directly.
-        scores = self.prog_candidate_val_subscores[program_idx]
+        scores = self.prog_candidate_per_example_scores[program_idx]
         if not scores:
             return float("-inf"), 0
         num_samples = len(scores)
@@ -451,24 +552,32 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
         ids that have been scored at least once.
         """
         result: dict[DataId, list[ProgramIdx]] = defaultdict(list)
-        for program_idx, val_scores in enumerate(self.prog_candidate_val_subscores):
+        for program_idx, val_scores in enumerate(self.prog_candidate_per_example_scores):
             for val_id in val_scores.keys():
                 result[val_id].append(program_idx)
         return result
 
     @property
-    def program_full_scores_val_set(self) -> list[float]:
-        # TODO: This should be using the val_evaluation_policy instead of the get_program_average_val_subset method to calculate the scores.
-        return [
-            self.get_program_average_val_subset(program_idx)[0]
-            for program_idx in range(len(self.prog_candidate_val_subscores))
-        ]
+    def program_full_acceptance_scores_val_set(self) -> list[float]:
+        """Per-candidate acceptance scores used for ranking, selection, and ``best_idx``.
+
+        The seed is ``SEED_ACCEPTANCE_SCORE`` (1.0). Later candidates are
+        ``mean(parent acceptance scores) + mean(improvement() deltas)``
+        on the full val eval (a single parent is unchanged).
+        """
+        return list(self.prog_candidate_acceptance_scores)
 
     @property
     def per_program_tracked_scores(self) -> list[float]:
+        """Alias of :attr:`program_full_acceptance_scores_val_set`."""
+        return self.program_full_acceptance_scores_val_set
+
+    @property
+    def program_raw_scores_val_set(self) -> list[float]:
+        """Per-candidate mean of raw validation metric scores (not acceptance-adjusted)."""
         return [
             self.get_program_average_val_subset(program_idx)[0]
-            for program_idx in range(len(self.prog_candidate_val_subscores))
+            for program_idx in range(len(self.prog_candidate_per_example_scores))
         ]
 
     def _update_objective_pareto_front(self, objective_scores: ObjectiveScores, program_idx: ProgramIdx) -> None:
@@ -531,6 +640,8 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
         valset_evaluation: ValsetEvaluation,
         run_dir: str | None,
         num_metric_calls_by_discovery_of_new_program: int,
+        acceptance_score: float,
+        per_example_acceptance_scores: dict[DataId, float],
     ) -> ProgramIdx:
         new_program_idx = len(self.program_candidates)
         self.program_candidates.append(dict(new_program))
@@ -544,11 +655,19 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
         self.parent_program_for_candidate.append(list(parent_program_idx))
 
         valset_scores = dict(valset_evaluation.scores_by_val_id)
-        self.prog_candidate_val_subscores.append(valset_scores)
+        self.prog_candidate_per_example_scores.append(valset_scores)
         objective_scores = self._aggregate_objective_scores(valset_evaluation.objective_scores_by_val_id)
         self.prog_candidate_objective_scores.append(objective_scores)
+        if valset_evaluation.objective_scores_by_val_id:
+            self.prog_candidate_objective_subscores.append(dict(valset_evaluation.objective_scores_by_val_id))
+        else:
+            self.prog_candidate_objective_subscores.append(None)
 
-        for val_id, score in valset_scores.items():
+        self.prog_candidate_acceptance_scores.append(acceptance_score)
+        derived_per_example_acceptance = dict(per_example_acceptance_scores)
+        self.prog_candidate_per_example_acceptance_scores.append(derived_per_example_acceptance)
+
+        for val_id, score in derived_per_example_acceptance.items():
             output = valset_evaluation.outputs_by_val_id.get(val_id) if valset_evaluation.outputs_by_val_id else None
             self._update_pareto_front_for_val_id(
                 val_id,

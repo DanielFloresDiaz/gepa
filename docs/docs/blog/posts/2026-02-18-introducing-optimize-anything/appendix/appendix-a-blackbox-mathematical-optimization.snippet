@@ -8,7 +8,7 @@
     ```python
     SEED_CODE = """
     import numpy as np
-    
+
     def solve(objective_function, config, best_xs=None):
         bounds = np.array(config['bounds'])
         x = np.random.uniform(bounds[:, 0], bounds[:, 1])
@@ -50,7 +50,7 @@
     ```
 
     **Optimizer** -  This is a Single-Task Search mode: no `dataset` needed, just a natural-language `objective`. `background` lets you inject domain knowledge and constraints into the optimization loop. `cache_evaluation` caches scores and side information, saving metric calls on repeated evaluations. `max_candidate_proposals` caps the total number of proposals generated across the entire run.
-    
+
     ```python
     from gepa.optimize_anything import optimize_anything, GEPAConfig, EngineConfig, ReflectionConfig
 
@@ -350,4 +350,3 @@
         return {"x": best_x, "score": best_score, "all_attempts": all_attempts}
     ```
     </section>
-

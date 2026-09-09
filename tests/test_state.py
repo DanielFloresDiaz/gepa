@@ -211,8 +211,8 @@ def test_dynamic_validation(run_dir, rng):
 
     state_phase_one = state_mod.GEPAState.load(str(run_dir))
     assert len(state_phase_one.program_candidates) >= 2
-    assert 0 in state_phase_one.prog_candidate_val_subscores[-1]
-    assert 1 not in state_phase_one.prog_candidate_val_subscores[-1]
+    assert 0 in state_phase_one.prog_candidate_per_example_scores[-1]
+    assert 1 not in state_phase_one.prog_candidate_per_example_scores[-1]
     assert state_phase_one.valset_evaluations.keys() == {0, 1}
 
     extended_valset = valset_initial + [{"id": 2, "difficulty": 4}]
@@ -250,8 +250,8 @@ def test_dynamic_validation(run_dir, rng):
 
     resumed_state = state_mod.GEPAState.load(str(run_dir))
     assert resumed_state.valset_evaluations.keys() == valset_ids
-    assert set(resumed_state.prog_candidate_val_subscores[0].keys()) == {0, 1}
-    covered_ids = set().union(*[scores.keys() for scores in resumed_state.prog_candidate_val_subscores])
+    assert set(resumed_state.prog_candidate_per_example_scores[0].keys()) == {0, 1}
+    covered_ids = set().union(*[scores.keys() for scores in resumed_state.prog_candidate_per_example_scores])
     assert covered_ids == {0, 1, 2}
 
 
@@ -268,8 +268,8 @@ def test_load_legacy_state(legacy_run_dir):
     """Ensure legacy gepa_state.bin files migrate correctly when loaded."""
     state = state_mod.GEPAState.load(str(legacy_run_dir))
 
-    assert isinstance(state.prog_candidate_val_subscores, list)
-    assert all(isinstance(scores, dict) for scores in state.prog_candidate_val_subscores)
+    assert isinstance(state.prog_candidate_per_example_scores, list)
+    assert all(isinstance(scores, dict) for scores in state.prog_candidate_per_example_scores)
     assert state.validation_schema_version == state_mod.GEPAState._VALIDATION_SCHEMA_VERSION
     assert state.valset_evaluations.keys() == set(range(45))
 
@@ -308,6 +308,7 @@ def test_upgrade_state_dict_adds_adapter_state():
     """Migration adds adapter_state={} when missing (v4 → v5)."""
     d = {
         "program_candidates": [{"a": "b"}],
+        "prog_candidate_val_subscores": [{0: 0.5}],
         "prog_candidate_objective_scores": [{}],
         "objective_pareto_front": {},
         "program_at_pareto_front_objectives": {},
@@ -318,6 +319,112 @@ def test_upgrade_state_dict_adds_adapter_state():
     }
     state_mod.GEPAState._upgrade_state_dict(d)
     assert d["adapter_state"] == {}
+    assert d["prog_candidate_acceptance_scores"] == [1.0]
+    assert d["prog_candidate_per_example_acceptance_scores"] == [{0: 1.0}]
+    assert d["prog_candidate_per_example_scores"] == [{0: 0.5}]
+    assert "prog_candidate_val_subscores" not in d
+    assert "prog_candidate_acceptance_subscores" not in d
+    assert d["prog_candidate_objective_subscores"] == [None]
+    assert "use_raw_instance_frontier" not in d
+    assert d["validation_schema_version"] == state_mod.GEPAState._VALIDATION_SCHEMA_VERSION
+
+
+def test_upgrade_state_dict_rebuilds_centered_acceptance_from_raw_means():
+    """Older checkpoints get seed=1.0 and children at 1 + (raw[id] - seed_raw[id])."""
+    d = {
+        "program_candidates": [{"a": "seed"}, {"a": "child"}],
+        "prog_candidate_val_subscores": [{0: 0.5, 1: 0.5}, {0: 0.7, 1: 0.7}],
+        "prog_candidate_objective_scores": [{}, {}],
+        "objective_pareto_front": {},
+        "program_at_pareto_front_objectives": {},
+        "frontier_type": "instance",
+        "pareto_front_cartesian": {},
+        "program_at_pareto_front_cartesian": {},
+        "evaluation_cache": None,
+        "adapter_state": {},
+    }
+    state_mod.GEPAState._upgrade_state_dict(d)
+    assert d["prog_candidate_acceptance_scores"][0] == pytest.approx(1.0)
+    assert d["prog_candidate_acceptance_scores"][1] == pytest.approx(1.2)
+    assert d["prog_candidate_per_example_acceptance_scores"][1][0] == pytest.approx(1.2)
+    assert d["prog_candidate_per_example_acceptance_scores"][1][1] == pytest.approx(1.2)
+    assert "use_raw_instance_frontier" not in d
+
+
+def test_upgrade_raw_frontier_rebuilds_per_example_acceptance_subs():
+    """v6 builtin checkpoints stored raw child subs; migrate to 1 + (raw[id] - seed_raw[id])."""
+    d = {
+        "program_candidates": [{"a": "seed"}, {"a": "child"}],
+        "prog_candidate_val_subscores": [{0: 0.2, 1: 0.8}, {0: 0.9, 1: 0.4}],
+        "prog_candidate_acceptance_scores": [1.0, 1.15],
+        "prog_candidate_acceptance_subscores": [{0: 1.0, 1: 1.0}, {0: 0.9, 1: 0.4}],
+        "prog_candidate_objective_scores": [{}, {}],
+        "objective_pareto_front": {},
+        "program_at_pareto_front_objectives": {},
+        "frontier_type": "instance",
+        "pareto_front_cartesian": {},
+        "program_at_pareto_front_cartesian": {},
+        "evaluation_cache": None,
+        "adapter_state": {},
+        "use_raw_instance_frontier": True,
+    }
+    state_mod.GEPAState._upgrade_state_dict(d)
+    assert d["prog_candidate_acceptance_scores"] == [1.0, 1.15]
+    assert d["prog_candidate_per_example_acceptance_scores"][1][0] == pytest.approx(1.7)
+    assert d["prog_candidate_per_example_acceptance_scores"][1][1] == pytest.approx(0.6)
+    assert d["pareto_front_valset"][0] == pytest.approx(1.7)
+    assert d["pareto_front_valset"][1] == pytest.approx(1.0)
+    assert d["program_at_pareto_front_valset"][0] == {1}
+    assert d["program_at_pareto_front_valset"][1] == {0}
+    assert "use_raw_instance_frontier" not in d
+
+
+def test_upgrade_custom_frontier_keeps_derived_acceptance_subs():
+    """v6 custom checkpoints keep stored parent+delta subscores."""
+    d = {
+        "program_candidates": [{"a": "seed"}, {"a": "child"}],
+        "prog_candidate_val_subscores": [{0: 0.9}, {0: 0.4}],
+        "prog_candidate_acceptance_scores": [1.0, 1.03],
+        "prog_candidate_acceptance_subscores": [{0: 1.0}, {0: 1.03}],
+        "prog_candidate_objective_scores": [{}, {}],
+        "objective_pareto_front": {},
+        "program_at_pareto_front_objectives": {},
+        "frontier_type": "instance",
+        "pareto_front_cartesian": {},
+        "program_at_pareto_front_cartesian": {},
+        "evaluation_cache": None,
+        "adapter_state": {},
+        "use_raw_instance_frontier": False,
+    }
+    state_mod.GEPAState._upgrade_state_dict(d)
+    assert d["prog_candidate_per_example_acceptance_scores"][1] == {0: 1.03}
+    assert d["prog_candidate_acceptance_scores"][1] == pytest.approx(1.03)
+    assert "use_raw_instance_frontier" not in d
+
+
+def test_upgrade_v6_renames_score_fields_without_rebuilding_acceptance():
+    """v6 checkpoints keep stored acceptance values and only rename score fields."""
+    d = {
+        "program_candidates": [{"a": "seed"}, {"a": "child"}],
+        "prog_candidate_val_subscores": [{0: 0.9}, {0: 0.4}],
+        "prog_candidate_acceptance_scores": [1.0, 1.03],
+        "prog_candidate_acceptance_subscores": [{0: 1.0}, {0: 1.03}],
+        "prog_candidate_objective_scores": [{}, {}],
+        "objective_pareto_front": {},
+        "program_at_pareto_front_objectives": {},
+        "frontier_type": "instance",
+        "pareto_front_cartesian": {},
+        "program_at_pareto_front_cartesian": {},
+        "evaluation_cache": None,
+        "adapter_state": {},
+        "validation_schema_version": 6,
+    }
+    state_mod.GEPAState._upgrade_state_dict(d)
+    assert d["prog_candidate_per_example_scores"] == [{0: 0.9}, {0: 0.4}]
+    assert d["prog_candidate_per_example_acceptance_scores"] == [{0: 1.0}, {0: 1.03}]
+    assert d["prog_candidate_acceptance_scores"] == [1.0, 1.03]
+    assert "prog_candidate_val_subscores" not in d
+    assert "prog_candidate_acceptance_subscores" not in d
     assert d["validation_schema_version"] == state_mod.GEPAState._VALIDATION_SCHEMA_VERSION
 
 

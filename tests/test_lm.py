@@ -3,8 +3,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from gepa.lm import LM
 
 
@@ -177,4 +175,4 @@ class TestLMConformsToProtocol:
     def test_callable(self):
         lm = LM("openai/gpt-4.1")
         assert callable(lm)
-        assert hasattr(lm, "__call__")
+        assert callable(lm)

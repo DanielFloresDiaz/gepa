@@ -319,10 +319,10 @@ def test_rag_end_to_end_optimization(sample_ai_ml_dataset, mock_chromadb_store):
     # 3. Assertions: Verify the optimization completed successfully
     assert gepa_result is not None
     assert hasattr(gepa_result, "best_candidate")
-    assert hasattr(gepa_result, "val_aggregate_scores")
+    assert hasattr(gepa_result, "val_acceptance_scores")
 
     best_config = gepa_result.best_candidate
-    best_score = gepa_result.val_aggregate_scores[0]  # First (best) score
+    best_score = gepa_result.val_acceptance_scores[0]  # First (best) score
 
     # Basic validation of results
     assert isinstance(best_config, dict)
@@ -352,30 +352,30 @@ def test_rag_end_to_end_optimization(sample_ai_ml_dataset, mock_chromadb_store):
     assert gepa_result.best_idx == 0  # First (base) program should be best in this deterministic test
 
     # 2. Verify score arrays have expected structure
-    assert len(gepa_result.val_aggregate_scores) == 1  # Only one validation score recorded
-    assert len(gepa_result.val_subscores) == 1  # Val subscores for each candidate
-    assert len(gepa_result.val_subscores[0]) == 1  # One score per evaluated validation instance
-    assert all(isinstance(score, (int, float)) for score in gepa_result.val_aggregate_scores)
-    assert all(isinstance(subscores, dict) for subscores in gepa_result.val_subscores)
-    assert all(0 <= score <= 1 for score in gepa_result.val_aggregate_scores)  # Scores should be normalized
+    assert len(gepa_result.val_acceptance_scores) == 1  # Only one validation score recorded
+    assert len(gepa_result.val_per_example_scores) == 1  # Val subscores for each candidate
+    assert len(gepa_result.val_per_example_scores[0]) == 1  # One score per evaluated validation instance
+    assert all(isinstance(score, (int, float)) for score in gepa_result.val_acceptance_scores)
+    assert all(isinstance(subscores, dict) for subscores in gepa_result.val_per_example_scores)
+    assert gepa_result.val_acceptance_scores[0] == pytest.approx(1.0)
 
     # 3. Verify base program evaluation (iteration 0) happened
-    base_val_score = gepa_result.val_aggregate_scores[0]
+    base_val_score = gepa_result.val_acceptance_scores[0]
     base_val_subscore = next(
-        iter(gepa_result.val_subscores[0].values())
+        iter(gepa_result.val_per_example_scores[0].values())
     )  # First candidate, first evaluated val instance
     assert isinstance(base_val_score, (int, float))
     assert isinstance(base_val_subscore, (int, float))
-    assert base_val_score > 0  # Should have meaningful score from mock LLM
-    assert base_val_score == base_val_subscore  # Should match since only one val instance
+    assert base_val_score > 0  # Seed acceptance is centered at 1.0
+    assert 0 <= base_val_subscore <= 1  # Raw metric stays in [0, 1]
 
     # 4. Verify GEPA attempted optimization iterations (metric calls include subsampling)
     assert gepa_result.total_metric_calls > gepa_result.num_full_val_evals  # Should have done subsampling
     # With 7 total metric calls but only 1 full val eval, GEPA did internal optimization work
 
     # 5. Verify best candidate selection logic worked
-    best_val_score = gepa_result.val_aggregate_scores[gepa_result.best_idx]
-    assert best_val_score == max(gepa_result.val_aggregate_scores)  # Best idx should point to highest score
+    best_val_score = gepa_result.val_acceptance_scores[gepa_result.best_idx]
+    assert best_val_score == max(gepa_result.val_acceptance_scores)  # Best idx should point to highest score
 
     # 6. Encode expected optimized prompt structure based on reflection_lm output
     # Our simple_reflection_lm returns a specific JSON structure - verify GEPA used it correctly
@@ -415,7 +415,7 @@ def test_rag_end_to_end_optimization(sample_ai_ml_dataset, mock_chromadb_store):
     assert gepa_result2.total_metric_calls == gepa_result.total_metric_calls
     assert gepa_result2.num_full_val_evals == gepa_result.num_full_val_evals
     assert gepa_result2.best_idx == gepa_result.best_idx
-    assert gepa_result2.val_aggregate_scores == gepa_result.val_aggregate_scores
+    assert gepa_result2.val_acceptance_scores == gepa_result.val_acceptance_scores
     assert gepa_result2.best_candidate == gepa_result.best_candidate
 
     # 8. Record and assert exact expected results (regression test for GEPA workflow)
@@ -426,7 +426,7 @@ def test_rag_end_to_end_optimization(sample_ai_ml_dataset, mock_chromadb_store):
         "best_idx": 0,  # Base program should be best with our deterministic setup
         # Exact scores depend on the mock LLM responses and evaluation logic
         # These values were captured from an actual test run
-        "expected_val_score": 0.6637837837837838,  # Exact score from deterministic run
+        "expected_raw_val_score": 0.6637837837837838,  # Exact raw metric score from deterministic run
         # The final prompt should match exactly - recorded from actual run
         "seed_prompt": SEED_PROMPT,
         "expected_final_prompt": SEED_PROMPT,  # No change in this deterministic case
@@ -441,9 +441,9 @@ def test_rag_end_to_end_optimization(sample_ai_ml_dataset, mock_chromadb_store):
     assert gepa_result.best_idx == EXPECTED_EXACT_RESULTS["best_idx"]
 
     # Assert exact score from recorded run
-    expected_val_score = EXPECTED_EXACT_RESULTS["expected_val_score"]
-    assert base_val_score == expected_val_score, (
-        f"Base validation score {base_val_score} != expected {expected_val_score}"
+    expected_raw_val_score = EXPECTED_EXACT_RESULTS["expected_raw_val_score"]
+    assert base_val_subscore == expected_raw_val_score, (
+        f"Base raw validation score {base_val_subscore} != expected {expected_raw_val_score}"
     )
 
     # 9. Assert exact final prompt (the key assertion requested in PR feedback)
@@ -537,13 +537,13 @@ def test_rag_dynamic_valset_round_robin_sample(sample_ai_ml_dataset, mock_chroma
     assert val_loader.num_unlocked_stages == 3
     assert val_loader.batches_served >= 6
     assert adapter_stage_one.val_eval_calls + adapter_stage_two.val_eval_calls >= 3
-    assert len(result_stage_two.val_subscores) >= 1
+    assert len(result_stage_two.val_per_example_scores) >= 1
     assert result_stage_two.num_full_val_evals >= 1
 
-    covered_ids = set().union(*(scores.keys() for scores in result_stage_two.val_subscores))
+    covered_ids = set().union(*(scores.keys() for scores in result_stage_two.val_per_example_scores))
     assert covered_ids == {0, 1, 2}
 
-    assert len(result_stage_two.val_subscores[0]) == len(covered_ids)
+    assert len(result_stage_two.val_per_example_scores[0]) == len(covered_ids)
 
 
 def test_rag_adapter_basic_functionality(mock_chromadb_store):

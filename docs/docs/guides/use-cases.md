@@ -681,7 +681,7 @@ Discover how organizations and researchers are using GEPA to optimize AI systems
     **Pattern:**
 
     - Keep your DSPy program structure
-    - Change only the LM initialization  
+    - Change only the LM initialization
     - Re-run GEPA optimization for the new model
     - Much faster than manually re-tuning prompts
 
