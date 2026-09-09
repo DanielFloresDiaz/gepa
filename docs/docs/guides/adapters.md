@@ -47,7 +47,7 @@ class MyAdapter(GEPAAdapter[DataInst, Trajectory, RolloutOutput]):
     ) -> EvaluationBatch[Trajectory, RolloutOutput]:
         """Execute the system and return scores."""
         ...
-    
+
     def make_reflective_dataset(
         self,
         candidate: dict[str, str],
@@ -76,7 +76,7 @@ class TaskInput:
     expected_answer: str
 
 # Trajectory captures execution details
-@dataclass  
+@dataclass
 class ExecutionTrace:
     prompt_used: str
     model_response: str
@@ -99,7 +99,7 @@ from gepa.core.adapter import EvaluationBatch
 class MyAdapter:
     def __init__(self, model_name: str):
         self.model_name = model_name
-    
+
     def evaluate(
         self,
         batch: list[TaskInput],
@@ -109,22 +109,22 @@ class MyAdapter:
         outputs = []
         scores = []
         trajectories = [] if capture_traces else None
-        
+
         for task in batch:
             # Build prompt using candidate components
             prompt = candidate["system_prompt"] + "\n" + task.question
-            
+
             # Run your system
             response = self._call_model(prompt)
-            
+
             # Parse output
             output = TaskOutput(answer=response, confidence=0.9)
             outputs.append(output)
-            
+
             # Compute score (higher is better)
             score = 1.0 if output.answer == task.expected_answer else 0.0
             scores.append(score)
-            
+
             # Capture trace if requested
             if capture_traces:
                 trace = ExecutionTrace(
@@ -133,7 +133,7 @@ class MyAdapter:
                     intermediate_steps=[],
                 )
                 trajectories.append(trace)
-        
+
         return EvaluationBatch(
             outputs=outputs,
             scores=scores,
@@ -153,12 +153,12 @@ def make_reflective_dataset(
     components_to_update: list[str],
 ) -> dict[str, list[dict]]:
     """Build a reflective dataset for each component."""
-    
+
     dataset = {}
-    
+
     for component_name in components_to_update:
         component_data = []
-        
+
         for i, trace in enumerate(eval_batch.trajectories):
             record = {
                 "Inputs": {
@@ -168,15 +168,15 @@ def make_reflective_dataset(
                     "response": trace.model_response,
                 },
                 "Feedback": self._generate_feedback(
-                    trace, 
+                    trace,
                     eval_batch.outputs[i],
                     eval_batch.scores[i],
                 ),
             }
             component_data.append(record)
-        
+
         dataset[component_name] = component_data
-    
+
     return dataset
 
 def _generate_feedback(self, trace, output, score):
@@ -196,21 +196,21 @@ The more informative your feedback, the better GEPA can optimize:
 ```python
 def _generate_feedback(self, trace, output, expected, score):
     feedback_parts = []
-    
+
     # Include the score
     feedback_parts.append(f"Score: {score}")
-    
+
     # Explain what went wrong
     if score < 1.0:
         feedback_parts.append(f"Expected: {expected}")
         feedback_parts.append(f"Got: {output.answer}")
-        
+
         # Add specific error analysis
         if len(output.answer) > 100:
             feedback_parts.append("Issue: Response too verbose")
         if expected.lower() not in output.answer.lower():
             feedback_parts.append("Issue: Key information missing")
-    
+
     return "\n".join(feedback_parts)
 ```
 
@@ -221,7 +221,7 @@ Handle failures gracefully:
 ```python
 def evaluate(self, batch, candidate, capture_traces=False):
     outputs, scores, trajectories = [], [], []
-    
+
     for task in batch:
         try:
             output = self._run_task(task, candidate)
@@ -235,10 +235,10 @@ def evaluate(self, batch, candidate, capture_traces=False):
                     error=str(e),
                     # ... capture what you can
                 ))
-        
+
         outputs.append(output)
         scores.append(score)
-    
+
     return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
 ```
 
@@ -249,7 +249,7 @@ Support multiple objectives:
 ```python
 def evaluate(self, batch, candidate, capture_traces=False):
     # ... evaluation logic ...
-    
+
     objective_scores = []
     for output in outputs:
         objective_scores.append({
@@ -257,7 +257,7 @@ def evaluate(self, batch, candidate, capture_traces=False):
             "latency": 1.0 / (1.0 + output.latency),  # Lower is better, inverted
             "cost": 1.0 / (1.0 + output.token_count),
         })
-    
+
     return EvaluationBatch(
         outputs=outputs,
         scores=scores,
@@ -293,7 +293,7 @@ class QAOutput:
 class SimpleQAAdapter(GEPAAdapter[QAInput, QATrace, QAOutput]):
     def __init__(self, model: str = "openai/gpt-4o-mini"):
         self.model = model
-    
+
     def evaluate(
         self,
         batch: list[QAInput],
@@ -302,34 +302,34 @@ class SimpleQAAdapter(GEPAAdapter[QAInput, QATrace, QAOutput]):
     ) -> EvaluationBatch[QATrace, QAOutput]:
         outputs, scores = [], []
         trajectories = [] if capture_traces else None
-        
+
         for item in batch:
             # Build prompt
             prompt = f"{candidate['system_prompt']}\n\nQuestion: {item.question}"
-            
+
             # Call model
             response = litellm.completion(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
             )
             answer = response.choices[0].message.content
-            
+
             # Score
             output = QAOutput(answer=answer)
             score = 1.0 if item.answer.lower() in answer.lower() else 0.0
-            
+
             outputs.append(output)
             scores.append(score)
-            
+
             if capture_traces:
                 trajectories.append(QATrace(prompt=prompt, response=answer))
-        
+
         return EvaluationBatch(
             outputs=outputs,
             scores=scores,
             trajectories=trajectories,
         )
-    
+
     def make_reflective_dataset(
         self,
         candidate: dict[str, str],
@@ -337,14 +337,14 @@ class SimpleQAAdapter(GEPAAdapter[QAInput, QATrace, QAOutput]):
         components_to_update: list[str],
     ) -> dict[str, list[dict]]:
         dataset = {"system_prompt": []}
-        
+
         for i, trace in enumerate(eval_batch.trajectories or []):
             dataset["system_prompt"].append({
                 "Inputs": {"question": trace.prompt.split("Question: ")[-1]},
                 "Generated Outputs": {"answer": trace.response},
                 "Feedback": f"Score: {eval_batch.scores[i]}"
             })
-        
+
         return dataset
 
 # Usage

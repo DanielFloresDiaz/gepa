@@ -199,9 +199,7 @@ def optimize(
         raise ValueError("seed_candidate must contain at least one component value.")
 
     if custom_component_proposer is not _UNSET and custom_candidate_proposer is not None:
-        raise ValueError(
-            "Pass only one of custom_component_proposer or custom_candidate_proposer, not both."
-        )
+        raise ValueError("Pass only one of custom_component_proposer or custom_candidate_proposer, not both.")
     if custom_component_proposer is not _UNSET:
         resolved_custom_proposer = custom_component_proposer
     elif custom_candidate_proposer is not None:

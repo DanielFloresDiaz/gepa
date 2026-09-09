@@ -474,9 +474,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
                 )
                 reject_reason = f"New subsample score {new_sum} not better than old score {old_sum}"
             else:
-                bonus_suffix = (
-                    f", stagnation bonus {stagnation_bonus:.4f}" if stagnation_bonus is not None else ""
-                )
+                bonus_suffix = f", stagnation bonus {stagnation_bonus:.4f}" if stagnation_bonus is not None else ""
                 reject_msg = (
                     f"Iteration {iteration}: Candidate rejected by acceptance criterion "
                     f"(mean improvement {mean_delta:.4f}{bonus_suffix}), skipping"

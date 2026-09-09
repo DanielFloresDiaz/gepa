@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from gepa.optimize_anything import (
-    GEPAConfig,
     EngineConfig,
+    GEPAConfig,
     ReflectionConfig,
     optimize_anything,
 )

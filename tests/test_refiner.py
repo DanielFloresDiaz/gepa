@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from gepa.optimize_anything import (
-    DEFAULT_REFINER_PROMPT,
     EngineConfig,
     GEPAConfig,
     RefinerConfig,
@@ -543,7 +542,6 @@ class TestRefiner:
             f"Final score ({score}) must be >= original ({original_score}) — the refiner should never make things worse"
         )
 
-
     def test_refiner_fallback_scores_when_all_refinements_fail(self):
         """When all refinement attempts fail (e.g. JSON parse errors), best_refined_scores
         should fall back to the original evaluation's scores, not remain empty.
@@ -589,9 +587,7 @@ class TestRefiner:
             "refiner_prompt": "Improve the guess. Return a JSON dict with 'number'.",
         }
 
-        score, output, side_info = adapter._evaluate_single_with_refinement(
-            candidate, _SINGLE_INSTANCE_SENTINEL
-        )
+        score, output, side_info = adapter._evaluate_single_with_refinement(candidate, _SINGLE_INSTANCE_SENTINEL)
 
         refiner_info = side_info["refiner_prompt_specific_info"]
 
@@ -768,7 +764,7 @@ class TestRefinerFrontierTypes:
         assert len(eval_batch.objective_scores) == len(DATASET)
 
         for i, (score, side_info, obj_scores) in enumerate(
-            zip(eval_batch.scores, eval_batch.trajectories, eval_batch.objective_scores)
+            zip(eval_batch.scores, eval_batch.trajectories, eval_batch.objective_scores, strict=False)
         ):
             print(f"\n[{frontier_type}] Example {i} (golden={DATASET[i]['golden']}):")
             print(f"  Score: {score}")

@@ -32,4 +32,3 @@ __all__ = [
     # Trace dataset
     "load_trace_dataset",
 ]
-

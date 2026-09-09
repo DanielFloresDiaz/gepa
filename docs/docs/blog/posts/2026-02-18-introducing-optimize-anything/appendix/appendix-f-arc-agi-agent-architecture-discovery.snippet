@@ -50,7 +50,7 @@
         }
     ```
 
-    **Optimizer** — This is **Generalization** mode with `dataset` for training and `valset` for validation. The agent must generalize to unseen `testset` puzzles, so just memorizing patterns from the training set won't help. `parallel=True` with `max_workers=64` enables massive concurrent evaluation across puzzles. `background` provides domain knowledge about ARC puzzle structure. Gemini 3 Flash is used as both the reflection model and the agent's internal LLM. Note that using a stronger reflection model can find a even more effective artifact in general. 
+    **Optimizer** — This is **Generalization** mode with `dataset` for training and `valset` for validation. The agent must generalize to unseen `testset` puzzles, so just memorizing patterns from the training set won't help. `parallel=True` with `max_workers=64` enables massive concurrent evaluation across puzzles. `background` provides domain knowledge about ARC puzzle structure. Gemini 3 Flash is used as both the reflection model and the agent's internal LLM. Note that using a stronger reflection model can find a even more effective artifact in general.
 
     ```python
     from gepa.optimize_anything import optimize_anything, GEPAConfig, EngineConfig, ReflectionConfig
@@ -109,7 +109,7 @@
     {training_exs}
 
     Task:
-    Write a Python function `transform(grid)` using numpy. 
+    Write a Python function `transform(grid)` using numpy.
     The function should return the transformed grid as a list of lists.
     Ensure your code is robust and handles grid boundaries.
 
@@ -124,13 +124,13 @@
     """
 
         response = llm(programmer_prompt)
-        
+
         def extract_code(text):
             code_match = re.search(r"```python\s*(.*?)\s*```", text, re.DOTALL)
             return code_match.group(1) if code_match else ""
 
         code = extract_code(response)
-        
+
         # Stage 2: Code Validation and Auto-Correction
         max_fix_attempts = 2
         best_code = code
@@ -138,7 +138,7 @@
         for _ in range(max_fix_attempts):
             success_count = 0
             execution_feedback = ""
-            
+
             if not best_code:
                 break
 
@@ -148,7 +148,7 @@
                 exec("import numpy as np", namespace)
                 exec(best_code, namespace)
                 transform_fn = namespace.get('transform')
-                
+
                 if not transform_fn:
                     raise Exception("Function 'transform' not found in code.")
 
@@ -186,14 +186,14 @@
         # Stage 3: Execution and Fallback Generation
         final_test_results = []
         code_functional = False
-        
+
         # Attempt to execute best_code on test inputs
         try:
             namespace = {}
             exec("import numpy as np", namespace)
             exec(best_code, namespace)
             transform_fn = namespace['transform']
-            
+
             code_test_outputs = []
             for t_in in test_inputs:
                 code_test_outputs.append(transform_fn(t_in))
@@ -229,7 +229,7 @@
         # Assemble 2 attempts for each test input
         for idx, t_in in enumerate(test_inputs):
             attempts = []
-            
+
             # 1st Attempt: Code output (if functional) or first fallback
             if code_functional and idx < len(code_test_outputs):
                 attempts.append(code_test_outputs[idx])
@@ -237,15 +237,15 @@
                 attempts.append(fallback_grids[idx])
             else:
                 attempts.append(t_in) # Safety
-                
+
             # 2nd Attempt: Top fallback or a modified version of the first
             if idx < len(fallback_grids) and fallback_grids[idx] not in attempts:
                 attempts.append(fallback_grids[idx])
-            
+
             # Padding to 2 attempts
             while len(attempts) < 2:
                 attempts.append(attempts[0])
-                
+
             final_test_results.append(attempts[:2])
 
         return {

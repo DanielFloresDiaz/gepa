@@ -34,11 +34,11 @@ from gepa.core.callbacks import (
     OptimizationEndEvent,
     OptimizationStartEvent,
     ParetoFrontUpdatedEvent,
-    make_proposal_end_event,
     ProposalStartEvent,
     ReflectiveDatasetBuiltEvent,
     StateSavedEvent,
     ValsetEvaluatedEvent,
+    make_proposal_end_event,
     notify_callbacks,
 )
 

@@ -191,10 +191,12 @@ class TestPromptRendererImages:
     def test_multiple_images(self):
         img1 = Image(url="https://example.com/a.png")
         img2 = Image(base64_data=_TINY_PNG_B64, media_type="image/png")
-        result = self._render([
-            {"Input": "x", "Chart": img1},
-            {"Input": "y", "Plot": img2},
-        ])
+        result = self._render(
+            [
+                {"Input": "x", "Chart": img1},
+                {"Input": "y", "Plot": img2},
+            ]
+        )
         content = result[0]["content"]
         # text + 2 images
         assert len(content) == 3

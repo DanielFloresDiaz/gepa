@@ -22,4 +22,4 @@ class LaunchResult:
 
 
 # Type alias for all possible actions
-Action = Union[TryLaunch, Terminate] 
+Action = Union[TryLaunch, Terminate]

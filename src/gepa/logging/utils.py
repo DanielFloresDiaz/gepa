@@ -57,7 +57,9 @@ def log_detailed_metrics_after_discovering_new_program(
     logger.log(f"Iteration {iteration}: Per-example acceptance scores for {program_label}: {per_example_acceptance}")
     if objective_scores:
         logger.log(f"Iteration {iteration}: Objective aggregate scores for {program_label}: {objective_scores}")
-    logger.log(f"Iteration {iteration}: Instance Pareto front (per-example acceptance): {gepa_state.pareto_front_valset}")
+    logger.log(
+        f"Iteration {iteration}: Instance Pareto front (per-example acceptance): {gepa_state.pareto_front_valset}"
+    )
     if gepa_state.objective_pareto_front:
         logger.log(f"Iteration {iteration}: Objective Pareto front scores: {gepa_state.objective_pareto_front}")
 
@@ -69,7 +71,9 @@ def log_detailed_metrics_after_discovering_new_program(
     pareto_avg = sum(pareto_scores) / len(pareto_scores)
 
     logger.log(f"Iteration {iteration}: Instance Pareto front mean acceptance: {pareto_avg}")
-    logger.log(f"Iteration {iteration}: Updated instance Pareto front programs: {gepa_state.program_at_pareto_front_valset}")
+    logger.log(
+        f"Iteration {iteration}: Updated instance Pareto front programs: {gepa_state.program_at_pareto_front_valset}"
+    )
     if gepa_state.program_at_pareto_front_objectives:
         logger.log(
             f"Iteration {iteration}: Updated objective Pareto front programs: {gepa_state.program_at_pareto_front_objectives}"

@@ -745,13 +745,10 @@ class ReflectionConfig:
 
     def __post_init__(self) -> None:
         if self.component_selector is not None and self.module_selector != "round_robin":
-            raise ValueError(
-                "Pass only one of component_selector or module_selector in ReflectionConfig, not both."
-            )
+            raise ValueError("Pass only one of component_selector or module_selector in ReflectionConfig, not both.")
         if self.custom_component_proposer is not None and self.custom_candidate_proposer is not None:
             raise ValueError(
-                "Pass only one of custom_component_proposer or custom_candidate_proposer in ReflectionConfig, "
-                "not both."
+                "Pass only one of custom_component_proposer or custom_candidate_proposer in ReflectionConfig, not both."
             )
 
 
@@ -1508,8 +1505,7 @@ def optimize_anything(
         }.get(selector_cfg)
 
         assert module_selector_cls is not None, (
-            f"Unknown component_selector strategy: {selector_cfg}. "
-            "Supported strategies: 'round_robin', 'all'"
+            f"Unknown component_selector strategy: {selector_cfg}. Supported strategies: 'round_robin', 'all'"
         )
 
         module_selector_instance: ReflectionComponentSelector = module_selector_cls()

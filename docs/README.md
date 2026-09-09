@@ -104,7 +104,7 @@ The API documentation is auto-generated from `scripts/generate_api_docs.py`:
 2. Run `uv run python scripts/generate_api_docs.py` to regenerate all API docs
 3. Add the new page to the `nav` section in `mkdocs.yml`
 
-**Note**: The `API_MAPPING` in `generate_api_docs.py` is the source of truth for API documentation. 
+**Note**: The `API_MAPPING` in `generate_api_docs.py` is the source of truth for API documentation.
 The script auto-generates both the markdown files and the index content.
 
 ## Automation Features

@@ -14,7 +14,6 @@ from gepa.core.callbacks import (
     EvaluationStartEvent,
     GEPACallback,
     MinibatchSampledEvent,
-    ProposalEndEvent,
     ProposalStartEvent,
     ReflectiveDatasetBuiltEvent,
     make_proposal_end_event,

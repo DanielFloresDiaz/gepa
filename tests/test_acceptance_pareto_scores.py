@@ -150,7 +150,9 @@ def test_strict_improvement_ranking_follows_raw_mean_order(tmp_path):
     )
 
     seed_raw = sum(result.val_per_example_scores[0].values()) / len(result.val_per_example_scores[0])
-    best_raw = sum(result.val_per_example_scores[result.best_idx].values()) / len(result.val_per_example_scores[result.best_idx])
+    best_raw = sum(result.val_per_example_scores[result.best_idx].values()) / len(
+        result.val_per_example_scores[result.best_idx]
+    )
     assert result.val_acceptance_scores[0] == pytest.approx(1.0)
     assert result.best_idx != 0
     assert best_raw > seed_raw

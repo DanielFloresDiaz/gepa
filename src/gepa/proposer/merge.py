@@ -207,6 +207,7 @@ def sample_and_attempt_merge_programs_by_common_predictors(
 
     return None
 
+
 # TODO: improve merging logic using for instance another proposer.
 class MergeProposer(ProposeNewCandidate[DataId]):
     """
@@ -344,7 +345,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
         assert set(subsample_ids).issubset(state.prog_candidate_per_example_scores[id2].keys())
         id1_sub_scores = [state.prog_candidate_per_example_scores[id1][k] for k in subsample_ids]
         id2_sub_scores = [state.prog_candidate_per_example_scores[id2][k] for k in subsample_ids]
-        before_scores = [(s1 + s2) / 2 for s1, s2 in zip(id1_sub_scores, id2_sub_scores)]
+        before_scores = [(s1 + s2) / 2 for s1, s2 in zip(id1_sub_scores, id2_sub_scores, strict=False)]
         state.full_program_trace[-1]["subsample_ids"] = subsample_ids
 
         mini_devset = self.valset.fetch(subsample_ids)

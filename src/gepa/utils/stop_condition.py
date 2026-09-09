@@ -73,7 +73,9 @@ class ScoreThresholdStopper(StopperProtocol):
         # return true if score threshold is reached
         try:
             current_best_score = (
-                max(gepa_state.program_full_acceptance_scores_val_set) if gepa_state.program_full_acceptance_scores_val_set else 0.0
+                max(gepa_state.program_full_acceptance_scores_val_set)
+                if gepa_state.program_full_acceptance_scores_val_set
+                else 0.0
             )
             return current_best_score >= self.threshold
         except Exception:
@@ -94,7 +96,9 @@ class NoImprovementStopper(StopperProtocol):
         # return true if max iterations without improvement reached
         try:
             current_score = (
-                max(gepa_state.program_full_acceptance_scores_val_set) if gepa_state.program_full_acceptance_scores_val_set else 0.0
+                max(gepa_state.program_full_acceptance_scores_val_set)
+                if gepa_state.program_full_acceptance_scores_val_set
+                else 0.0
             )
             if current_score > self.best_score:
                 self.best_score = current_score

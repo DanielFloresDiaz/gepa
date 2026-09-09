@@ -229,7 +229,10 @@ class GEPAResult(Generic[RolloutOutput, DataId, CandidateT]):
                 [dict(scores) for scores in val_aggregate_subscores] if val_aggregate_subscores is not None else None
             ),
             "per_objective_best_candidates": (
-                {objective: set(program_indices) for objective, program_indices in per_objective_best_candidates.items()}
+                {
+                    objective: set(program_indices)
+                    for objective, program_indices in per_objective_best_candidates.items()
+                }
                 if per_objective_best_candidates is not None
                 else None
             ),

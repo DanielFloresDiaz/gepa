@@ -22,7 +22,6 @@ from gepa.adapters.confidence_adapter.scoring import (
     ThresholdScoring,
 )
 
-
 # ---------------------------------------------------------------------------
 # Protocol conformance
 # ---------------------------------------------------------------------------

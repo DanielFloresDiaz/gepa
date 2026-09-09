@@ -28,11 +28,11 @@ except ImportError:
 class BCSimulator:
     """
     Broadcast Simulator for evaluating multi-destination data transfer paths.
-    
+
     Evaluates the cost and transfer time of broadcast topologies by simulating
     data flow through the network while respecting bandwidth constraints.
     """
-    
+
     # Default variables
     data_vol: float = 4.0  # size of data to be sent to multiple dsts (GB)
     num_partitions: int = 1
@@ -47,7 +47,7 @@ class BCSimulator:
     def __init__(self, num_vms, output_dir=None):
         """
         Initialize the simulator.
-        
+
         Args:
             num_vms: Number of VMs per region
             output_dir: Directory to write output files
@@ -58,7 +58,7 @@ class BCSimulator:
     def initialization(self, path, config):
         """
         Initialize simulation from path data and configuration.
-        
+
         Args:
             path: Either a file path to JSON or a BroadCastTopology object
             config: Configuration dict with data_vol, num_partitions, etc.
@@ -104,12 +104,12 @@ class BCSimulator:
     def evaluate_path(self, path, config, write_to_file=False):
         """
         Evaluate a broadcast path configuration.
-        
+
         Args:
             path: Path data (file path or BroadCastTopology)
             config: Configuration dict
             write_to_file: Whether to write results to output_dir
-            
+
         Returns:
             Tuple of (max_transfer_time, total_cost)
         """
@@ -151,9 +151,9 @@ class BCSimulator:
                         cost = edge_data["cost"]
                         throughput = edge_data["throughput"]
                         g.add_edge(
-                            src, dst_node, 
-                            throughput=throughput, 
-                            cost=edge_data["cost"], 
+                            src, dst_node,
+                            throughput=throughput,
+                            cost=edge_data["cost"],
                             flow=throughput
                         )
                         g[src][dst_node]["partitions"] = set()
@@ -172,7 +172,7 @@ class BCSimulator:
                     src, dst = edge[0], edge[1]
                     flow_proportion = 1 / len(list(in_edges))
                     g[src][dst]["flow"] = min(
-                        g[src][dst]["flow"], 
+                        g[src][dst]["flow"],
                         self.ingress_limits.get(provider, 10) * flow_proportion
                     )
 
@@ -181,7 +181,7 @@ class BCSimulator:
                     src, dst = edge[0], edge[1]
                     flow_proportion = 1 / len(list(out_edges))
                     g[src][dst]["flow"] = min(
-                        g[src][dst]["flow"], 
+                        g[src][dst]["flow"],
                         self.egress_limits.get(provider, 5) * flow_proportion
                     )
 
@@ -190,7 +190,7 @@ class BCSimulator:
     def __get_path(self):
         """Get all simple paths from source to destinations."""
         all_paths = [
-            path for node in self.dsts 
+            path for node in self.dsts
             for path in nx.all_simple_paths(self.g, self.src, node)
         ]
         return all_paths
@@ -203,7 +203,7 @@ class BCSimulator:
     def __transfer_time(self, log=True):
         """
         Calculate transfer time for each destination.
-        
+
         Returns:
             Tuple of (max_time, avg_time, last_destinations)
         """
@@ -214,7 +214,7 @@ class BCSimulator:
                 for edge in self.paths[dst][str(i)]:
                     edge_data = self.g[edge[0]][edge[1]]
                     partition_time = max(
-                        partition_time, 
+                        partition_time,
                         len(edge_data["partitions"]) * self.partition_data_vol * 8 / edge_data["flow"]
                     )
             t_dict[dst] = partition_time
@@ -222,7 +222,7 @@ class BCSimulator:
         max_t = max(t_dict.values())
         last_dst = [k for k, v in t_dict.items() if v == max_t]
         avg_t = sum(t_dict.values()) / len(t_dict.values())
-        
+
         return max_t, avg_t, last_dst
 
     def __total_cost(self):

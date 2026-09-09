@@ -113,7 +113,7 @@ dspy.configure(lm=lm)
 class QAProgram(dspy.Module):
     def __init__(self):
         self.generate = dspy.ChainOfThought("question -> answer")
-    
+
     def forward(self, question):
         return self.generate(question=question)
 
@@ -121,7 +121,7 @@ class QAProgram(dspy.Module):
 def metric_with_feedback(example, pred, trace=None):
     correct = example.answer.lower() in pred.answer.lower()
     score = 1.0 if correct else 0.0
-    
+
     # Provide textual feedback to guide GEPA's reflection
     if correct:
         feedback = f"Correct! The answer '{pred.answer}' matches the expected answer '{example.answer}'."
@@ -130,7 +130,7 @@ def metric_with_feedback(example, pred, trace=None):
             f"Incorrect. Expected '{example.answer}' but got '{pred.answer}'. "
             f"Think about how to reason more carefully to arrive at the correct answer."
         )
-    
+
     return dspy.Prediction(score=score, feedback=feedback)
 
 # Prepare data (aim for 30-300 examples for best results)
@@ -157,7 +157,7 @@ print(optimized_program.generate.signature.instructions)
 
 !!! tip "Feedback is Key"
     GEPA's strength lies in leveraging textual feedback. The more informative your feedback, the better GEPA can reflect and propose improvements. Include details like:
-    
+
     - What went wrong and what was expected
     - Hints for improvement
     - Reference solutions (if available)

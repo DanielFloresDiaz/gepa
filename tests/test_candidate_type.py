@@ -12,7 +12,6 @@ from typing import Any
 
 from gepa.core.adapter import CandidateT, EvaluationBatch, ProposalFn
 
-
 # ---------------------------------------------------------------------------
 # Concrete adapter typed with string component values
 # ---------------------------------------------------------------------------
@@ -116,11 +115,7 @@ def test_propose_improvements_attribute_can_be_set():
         reflective_dataset: Mapping[str, Sequence[Mapping[str, Any]]],
         components_to_update: list[str],
     ) -> dict[str, str]:
-        return {
-            name: f"improved: {candidate[name]}"
-            for name in components_to_update
-            if name in candidate
-        }
+        return {name: f"improved: {candidate[name]}" for name in components_to_update if name in candidate}
 
     adapter = TypedAdapter()
     adapter.propose_improvements = my_proposer

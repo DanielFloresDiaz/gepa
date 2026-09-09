@@ -3,8 +3,6 @@
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from gepa.core.engine import GEPAEngine
 from gepa.core.state import GEPAState, ValsetEvaluation
 from gepa.proposer.base import CandidateProposal, SubsampleEvaluation
