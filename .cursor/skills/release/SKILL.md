@@ -3,9 +3,10 @@ name: release
 description: >-
   Prepare GEPA releases from develop-to-main branch deltas or release context.
   Inspects git history, writes versioned changelogs, bumps pyproject.toml,
-  updates README, and runs release validation. Use when cutting a GEPA release,
-  bumping versions, generating changelog or release notes, or asking what is
-  unreleased between develop and main.
+  updates README, and runs CI-equivalent validation (pre-commit, build,
+  typecheck, test) on the release branch — all must pass before finishing.
+  Use when cutting a GEPA release, bumping versions, generating changelog or
+  release notes, or asking what is unreleased between develop and main.
 license: MIT
 ---
 
@@ -91,17 +92,28 @@ Prefer **MINOR** over **MAJOR** for `0.x` unless the user asks for a major bump.
 
 ## Validation
 
-Respect user instructions (e.g. skip tests). For Python changes in the release, follow `.cursor/skills/python-refactoring/SKILL.md` and `.cursor/skills/python-testing/SKILL.md`. Do not run those Python checks for documentation-only release edits.
+Validation checks the **branch being released** (typically `develop`), not only the release-artifact files you edited. A release is **not complete** until every check below passes. Do not defer failures as “pre-existing”, “unrelated to the changelog”, or “already on the branch” — fix them before finishing.
 
-From the `gepa/` directory:
+These mirror `.github/workflows/testing.yaml` (`lint`, `typecheck`, `test`). Respect an explicit user request to skip tests; otherwise run all of them.
+
+From the `gepa/` directory, in order:
 
 ```bash
-make pre-commit
+make pre-commit   # lint job: hooks + format + ruff (same as CI pre-commit)
+uv build          # lint job: package must build
 make typecheck
 make test
 ```
 
-Fix hook, formatting, or build failures before finishing.
+**Rules:**
+
+1. **All commands must exit 0** before you report the release as done.
+2. If any command fails, fix the underlying code or config, then re-run the **full** sequence until green. Follow `.cursor/skills/python-refactoring/SKILL.md` while fixing Python/type issues and `.cursor/skills/python-testing/SKILL.md` after code fixes.
+3. Do not skip `make typecheck` or `make test` just because your edits were changelog, README, or version bumps — CI still runs them on push.
+4. Do not finish with a deliverable that lists failed validation; either fix failures or stop and report what is blocking release.
+5. If pre-commit’s format hook reformats files, stage those changes and run the full sequence again.
+
+Only note skipped checks when the user explicitly asked to skip them.
 
 ## Tagging and publishing
 
@@ -120,6 +132,6 @@ Report briefly:
 - New version and date
 - Files created or updated
 - README changes (or version-only updates)
-- Validation results (note skipped checks if applicable)
+- Validation results — **all checks passed**, or which check is still failing and what you fixed (only omit checks if the user explicitly requested skipping them)
 
 Do not commit unless the user asks.
