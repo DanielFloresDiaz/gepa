@@ -36,5 +36,5 @@ make pre-commit  # run all pre-commit hooks
 
 - Linter/formatter: ruff (line length 120, double quotes, space indent)
 - Type checking: pyright
-- Python target: 3.10+
+- Python target: 3.13+
 - No relative imports (enforced by ruff)

@@ -1,6 +1,6 @@
 ## Environment Setup
 
-Python 3.10 or later is required.
+Python 3.13 or later is required.
 
 Setting up your GEPA development environment requires you to fork the GEPA repository and clone it locally.
 If you are not familiar with the GitHub fork process, please refer to [Fork a repository](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo). After creating the fork, clone
@@ -92,6 +92,6 @@ See `.cursor/skills/release/SKILL.md` for the full release workflow. In brief:
 
 ## CI
 
-- **`testing.yaml`** — lint, typecheck, test (Python 3.10–3.14), coverage (70% threshold)
+- **`testing.yaml`** — lint, typecheck, test (Python 3.13), coverage (70% threshold)
 - **`release.yaml`** — runs tests then publishes GitHub release with wheels on tag push
 - **`docs.yml`** — MkDocs build and GitHub Pages deploy (unchanged)
