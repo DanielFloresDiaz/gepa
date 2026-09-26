@@ -9,7 +9,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Generic, Literal, TypeAlias, cast
 
-from gepa.core.adapter import CandidateT, RolloutOutput
+from gepa.core.adapter import CandidateT, RolloutOutput, reported_metric_calls
 from gepa.core.data_loader import DataId
 from gepa.gepa_utils import json_default
 from gepa.logging.logger import LoggerProtocol
@@ -22,6 +22,28 @@ SEED_ACCEPTANCE_SCORE: float = 1.0
 
 # Type aliases
 ObjectiveScores: TypeAlias = dict[str, float]
+EvaluatorResult: TypeAlias = (
+    tuple[Any, list[float], Sequence[ObjectiveScores] | None]
+    | tuple[Any, list[float], Sequence[ObjectiveScores] | None, int]
+)
+
+
+def unpack_evaluator_result(
+    result: EvaluatorResult,
+    batch_size: int,
+) -> tuple[Any, list[float], Sequence[ObjectiveScores] | None, int]:
+    """Split an evaluator return into outputs, scores, objectives, and call count.
+
+    A 3-tuple charges one call per example. A 4-tuple carries the actual count
+    (for example when each example was executed more than once).
+    """
+    if len(result) == 4:
+        outputs, scores, objective_scores, num_calls = result
+        return outputs, scores, objective_scores, num_calls
+    outputs, scores, objective_scores = result
+    return outputs, scores, objective_scores, reported_metric_calls(None, batch_size)
+
+
 FrontierType: TypeAlias = Literal["instance", "objective", "hybrid", "cartesian"]
 """Strategy for tracking Pareto frontiers: 'instance' (per validation example), 'objective' (per objective metric), 'hybrid' (both), or 'cartesian' (per example x objective)."""
 FrontierKey: TypeAlias = DataId | str | tuple[str, DataId] | tuple[str, DataId, str]
@@ -99,7 +121,7 @@ class EvaluationCache(Generic[RolloutOutput, DataId, CandidateT]):
         candidate: dict[str, CandidateT],
         example_ids: list[DataId],
         fetcher: Callable[[list[DataId]], Any],
-        evaluator: Callable[[Any, dict[str, CandidateT]], tuple[Any, list[float], Sequence[ObjectiveScores] | None]],
+        evaluator: Callable[[Any, dict[str, CandidateT]], EvaluatorResult],
     ) -> tuple[dict[DataId, RolloutOutput], dict[DataId, float], dict[DataId, ObjectiveScores] | None, int]:
         """
         Evaluate using cache, returning full results.
@@ -119,9 +141,12 @@ class EvaluationCache(Generic[RolloutOutput, DataId, CandidateT]):
                 objective_by_id[eid] = c.objective_scores
 
         # Evaluate uncached examples
+        num_calls = 0
         if uncached_ids:
             batch = fetcher(uncached_ids)
-            outputs, scores, obj_scores = evaluator(batch, candidate)
+            outputs, scores, obj_scores, num_calls = unpack_evaluator_result(
+                evaluator(batch, candidate), len(uncached_ids)
+            )
             for idx, eid in enumerate(uncached_ids):
                 outputs_by_id[eid] = outputs[idx]
                 scores_by_id[eid] = scores[idx]
@@ -130,7 +155,7 @@ class EvaluationCache(Generic[RolloutOutput, DataId, CandidateT]):
                     objective_by_id[eid] = obj_scores[idx]
             self.put_batch(candidate, uncached_ids, outputs, scores, obj_scores)
 
-        return outputs_by_id, scores_by_id, objective_by_id, len(uncached_ids)
+        return outputs_by_id, scores_by_id, objective_by_id, num_calls
 
 
 @dataclass(slots=True)
@@ -728,7 +753,7 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
         candidate: dict[str, CandidateT],
         example_ids: list[DataId],
         fetcher: Callable[[list[DataId]], Any],
-        evaluator: Callable[[Any, dict[str, CandidateT]], tuple[Any, list[float], Sequence[ObjectiveScores] | None]],
+        evaluator: Callable[[Any, dict[str, CandidateT]], EvaluatorResult],
     ) -> tuple[list[float], int]:
         """Evaluate with optional caching. Returns (scores, num_actual_evals)."""
         _, scores_by_id, _, num_actual_evals = self.cached_evaluate_full(candidate, example_ids, fetcher, evaluator)
@@ -739,17 +764,19 @@ class GEPAState(Generic[RolloutOutput, DataId, CandidateT]):
         candidate: dict[str, CandidateT],
         example_ids: list[DataId],
         fetcher: Callable[[list[DataId]], Any],
-        evaluator: Callable[[Any, dict[str, CandidateT]], tuple[Any, list[float], Sequence[ObjectiveScores] | None]],
+        evaluator: Callable[[Any, dict[str, CandidateT]], EvaluatorResult],
     ) -> tuple[dict[DataId, RolloutOutput], dict[DataId, float], dict[DataId, ObjectiveScores] | None, int]:
         """Evaluate with optional caching, returning full results."""
         if self.evaluation_cache is not None:
             return self.evaluation_cache.evaluate_with_cache_full(candidate, example_ids, fetcher, evaluator)
         batch = fetcher(example_ids)
-        outputs, scores, objective_scores = evaluator(batch, candidate)
+        outputs, scores, objective_scores, num_calls = unpack_evaluator_result(
+            evaluator(batch, candidate), len(example_ids)
+        )
         outputs_by_id = dict(zip(example_ids, outputs, strict=False))
         scores_by_id = dict(zip(example_ids, scores, strict=False))
         objective_by_id = dict(zip(example_ids, objective_scores, strict=False)) if objective_scores else None
-        return outputs_by_id, scores_by_id, objective_by_id, len(example_ids)
+        return outputs_by_id, scores_by_id, objective_by_id, num_calls
 
 
 def write_eval_scores_to_directory(scores: dict[DataId, float], output_dir: str) -> None:
@@ -784,6 +811,7 @@ def initialize_gepa_state(
     track_best_outputs: bool = False,
     frontier_type: FrontierType = "instance",
     evaluation_cache: "EvaluationCache[RolloutOutput, DataId, CandidateT] | None" = None,
+    seed_metric_calls: int | None = None,
 ) -> "GEPAState[RolloutOutput, DataId, CandidateT]":
     if run_dir is not None and os.path.exists(os.path.join(run_dir, "gepa_state.bin")):
         logger.log("Loading gepa state from run dir")
@@ -820,6 +848,8 @@ def initialize_gepa_state(
         )
 
         gepa_state.num_full_ds_evals = 1
-        gepa_state.total_num_evals = len(seed_valset_evaluation.scores_by_val_id)
+        gepa_state.total_num_evals = (
+            seed_metric_calls if seed_metric_calls is not None else len(seed_valset_evaluation.scores_by_val_id)
+        )
 
     return gepa_state

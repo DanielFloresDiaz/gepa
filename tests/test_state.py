@@ -52,6 +52,65 @@ def test_initialize_gepa_state_fresh_init_writes_and_counts(run_dir):
     assert json.loads(p1.read_text()) == {"k": "out1"}
 
 
+def test_initialize_gepa_state_charges_repeated_seed_calls(run_dir):
+    """Seed budget uses the reported metric-call count when each example ran more than once."""
+    seed = {"model": "m"}
+    valset_out = ValsetEvaluation(
+        outputs_by_val_id={0: "out0", 1: "out1"},
+        scores_by_val_id={0: 0.1, 1: 0.2},
+    )
+
+    result = state_mod.initialize_gepa_state(
+        run_dir=str(run_dir),
+        logger=MagicMock(),
+        seed_candidate=seed,
+        seed_valset_evaluation=valset_out,
+        seed_metric_calls=6,
+    )
+
+    assert result.total_num_evals == 6
+
+
+def test_cached_evaluate_full_counts_repeated_executions():
+    """A batch of k examples executed n times increments the eval count by k * n."""
+    valset_out = ValsetEvaluation(outputs_by_val_id={0: "seed"}, scores_by_val_id={0: 1.0})
+    state = state_mod.GEPAState({"component": "text"}, valset_out)
+    k = 2
+    n = 3
+
+    def evaluator(batch, _candidate):
+        """Return one collapsed row per example and the full execution count."""
+        return (["out"] * len(batch), [0.4] * len(batch), None, len(batch) * n)
+
+    _outputs, _scores, _objectives, num_calls = state.cached_evaluate_full(
+        {"component": "text"},
+        [0, 1],
+        lambda ids: list(ids),
+        evaluator,
+    )
+
+    assert num_calls == k * n
+
+
+def test_cached_evaluate_full_defaults_to_one_call_per_example():
+    """Evaluators that omit a call count still charge one metric call per example."""
+    valset_out = ValsetEvaluation(outputs_by_val_id={0: "seed"}, scores_by_val_id={0: 1.0})
+    state = state_mod.GEPAState({"component": "text"}, valset_out)
+
+    def evaluator(batch, _candidate):
+        """Return the legacy 3-tuple."""
+        return (["out"] * len(batch), [0.4] * len(batch), None)
+
+    _outputs, _scores, _objectives, num_calls = state.cached_evaluate_full(
+        {"component": "text"},
+        [0, 1],
+        lambda ids: list(ids),
+        evaluator,
+    )
+
+    assert num_calls == 2
+
+
 def test_initialize_gepa_state_no_run_dir():
     """Without a run dir, the state is initialized from scratch and not saved."""
     seed = {"model": "m"}
