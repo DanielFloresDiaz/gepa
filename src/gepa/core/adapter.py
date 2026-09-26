@@ -48,6 +48,17 @@ class EvaluationBatch(Generic[Trajectory, RolloutOutput]):
     num_metric_calls: int | None = None
 
 
+def reported_metric_calls(num_metric_calls: int | None, batch_size: int) -> int:
+    """Metric calls to charge for a batch.
+
+    ``None`` means the evaluator ran each example once, so the charge is the
+    batch length. An explicit count covers repeated executions.
+    """
+    if num_metric_calls is None:
+        return batch_size
+    return num_metric_calls
+
+
 class ProposalFn(Protocol[CandidateT]):
     def __call__(
         self,

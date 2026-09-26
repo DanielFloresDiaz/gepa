@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-09-02T10:27:25.043793526Z"
+exclude-newer = "2026-09-19T09:38:13.213366673Z"
 exclude-newer-span = "P1W"
 
 [[package]]
@@ -811,7 +811,7 @@ http = [
 
 [[package]]
 name = "gepa"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "typing-extensions" },

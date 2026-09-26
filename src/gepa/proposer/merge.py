@@ -226,7 +226,8 @@ class MergeProposer(ProposeNewCandidate[DataId]):
         valset: DataLoader[DataId, DataInst],
         evaluator: Callable[
             [list[DataInst], dict[str, str]],
-            tuple[list[RolloutOutput], list[float], Sequence[ObjectiveScores] | None],
+            tuple[list[RolloutOutput], list[float], Sequence[ObjectiveScores] | None]
+            | tuple[list[RolloutOutput], list[float], Sequence[ObjectiveScores] | None, int],
         ],
         use_merge: bool,
         max_merge_invocations: int,

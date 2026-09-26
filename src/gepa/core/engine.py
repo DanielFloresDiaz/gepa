@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Generic, cast
 
-from gepa.core.adapter import CandidateT, DataInst, GEPAAdapter, RolloutOutput, Trajectory
+from gepa.core.adapter import CandidateT, DataInst, GEPAAdapter, RolloutOutput, Trajectory, reported_metric_calls
 from gepa.core.callbacks import (
     BudgetUpdatedEvent,
     CandidateAcceptedEvent,
@@ -112,9 +112,14 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
 
         def evaluator(
             batch: list[DataInst], program: dict[str, CandidateT]
-        ) -> tuple[list[RolloutOutput], list[float], Sequence[dict[str, float]] | None]:
+        ) -> tuple[list[RolloutOutput], list[float], Sequence[dict[str, float]] | None, int]:
             eval_result = adapter.evaluate(batch, program, capture_traces=False)
-            return eval_result.outputs, eval_result.scores, eval_result.objective_scores
+            return (
+                eval_result.outputs,
+                eval_result.scores,
+                eval_result.objective_scores,
+                reported_metric_calls(eval_result.num_metric_calls, len(batch)),
+            )
 
         self.evaluator = evaluator
 
@@ -677,18 +682,22 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
 
         def valset_evaluator(
             program: dict[str, CandidateT],
-        ) -> ValsetEvaluation[RolloutOutput, DataId]:
+        ) -> tuple[ValsetEvaluation[RolloutOutput, DataId], int]:
             all_ids = list(valset.all_ids())
-            outputs, scores, objective_scores = self.evaluator(valset.fetch(all_ids), program)
+            batch = valset.fetch(all_ids)
+            outputs, scores, objective_scores, num_calls = self.evaluator(batch, program)
             outputs_dict = dict(zip(all_ids, outputs, strict=False))
             scores_dict = dict(zip(all_ids, scores, strict=False))
             objective_scores_dict = (
                 dict(zip(all_ids, objective_scores, strict=False)) if objective_scores is not None else None
             )
-            return ValsetEvaluation(
-                outputs_by_val_id=outputs_dict,
-                scores_by_val_id=scores_dict,
-                objective_scores_by_val_id=objective_scores_dict,
+            return (
+                ValsetEvaluation(
+                    outputs_by_val_id=outputs_dict,
+                    scores_by_val_id=scores_dict,
+                    objective_scores_by_val_id=objective_scores_dict,
+                ),
+                num_calls,
             )
 
         # Notify callbacks of optimization start (before seed valset eval)
@@ -708,7 +717,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         )
 
         # Evaluate seed candidate on valset (after on_optimization_start callback)
-        seed_valset_evaluation = valset_evaluator(self.seed_candidate)
+        seed_valset_evaluation, seed_metric_calls = valset_evaluator(self.seed_candidate)
 
         # Initialize state with pre-computed seed evaluation
         state = initialize_gepa_state(
@@ -719,6 +728,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             track_best_outputs=self.track_best_outputs,
             frontier_type=self.frontier_type,
             evaluation_cache=self._initial_evaluation_cache,
+            seed_metric_calls=seed_metric_calls,
         )
 
         # Restore adapter state from persisted state (only has effect on resume)
