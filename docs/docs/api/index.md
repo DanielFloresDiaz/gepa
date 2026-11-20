@@ -49,6 +49,7 @@ Callback system for observing and instrumenting GEPA optimization runs.
 - [`CandidateRejectedEvent`](callbacks/CandidateRejectedEvent.md)
 - [`EvaluationStartEvent`](callbacks/EvaluationStartEvent.md)
 - [`EvaluationEndEvent`](callbacks/EvaluationEndEvent.md)
+- [`FullEvaluationStartEvent`](callbacks/FullEvaluationStartEvent.md)
 - [`ValsetEvaluatedEvent`](callbacks/ValsetEvaluatedEvent.md)
 - [`ParetoFrontUpdatedEvent`](callbacks/ParetoFrontUpdatedEvent.md)
 - [`MergeAttemptedEvent`](callbacks/MergeAttemptedEvent.md)
@@ -118,3 +119,4 @@ Strategies for various aspects of the optimization process.
 - [`EvaluationPolicy`](strategies/EvaluationPolicy.md)
 - [`FullEvaluationPolicy`](strategies/FullEvaluationPolicy.md)
 - [`InstructionProposalSignature`](strategies/InstructionProposalSignature.md)
+

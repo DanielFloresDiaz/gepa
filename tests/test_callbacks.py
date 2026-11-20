@@ -128,6 +128,9 @@ class RecordingCallback:
     def on_error(self, event):
         self._record("on_error", event)
 
+    def on_full_evaluation_start(self, event):
+        self._record("on_full_evaluation_start", event)
+
     def on_valset_evaluated(self, event):
         self._record("on_valset_evaluated", event)
 

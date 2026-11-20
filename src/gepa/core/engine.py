@@ -5,7 +5,7 @@ import os
 import traceback
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Generic, cast
+from typing import Any, Generic, Literal, cast
 
 from gepa.core.adapter import CandidateT, DataInst, GEPAAdapter, RolloutOutput, Trajectory, reported_metric_calls
 from gepa.core.callbacks import (
@@ -13,6 +13,7 @@ from gepa.core.callbacks import (
     CandidateAcceptedEvent,
     CandidateRejectedEvent,
     ErrorEvent,
+    FullEvaluationStartEvent,
     GEPACallback,
     IterationEndEvent,
     IterationStartEvent,
@@ -300,7 +301,22 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
         new_program: dict[str, CandidateT],
         state: GEPAState[RolloutOutput, DataId, CandidateT],
         parent_program_idx: list[int],
+        *,
+        iteration: int | None = None,
+        source: Literal["reflective", "merge"] = "reflective",
     ) -> tuple[int, int]:
+        """Evaluate an accepted candidate on the valset and add it to the pool.
+
+        ``iteration`` is the iteration that produced the candidate (default: the
+        current one). With parallel proposals it can be earlier than ``state.i + 1``,
+        so callbacks attribute the evaluation to the right iteration.
+        """
+        iteration = state.i + 1 if iteration is None else iteration
+        notify_callbacks(
+            self.callbacks,
+            "on_full_evaluation_start",
+            FullEvaluationStartEvent(iteration=iteration, parent_ids=parent_program_idx, source=source),
+        )
         num_metric_calls_by_discovery = state.total_num_evals
         valset_evaluation = self._evaluate_on_valset(new_program, state)
         state.num_full_ds_evals += 1
@@ -351,7 +367,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             self.callbacks,
             "on_pareto_front_updated",
             ParetoFrontUpdatedEvent(
-                iteration=state.i + 1,
+                iteration=iteration,
                 new_front=new_front,
                 displaced_candidates=displaced_candidates,
             ),
@@ -362,7 +378,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
 
         if is_best_program:
             self.logger.log(
-                f"Iteration {state.i + 1}: Found a better program on the valset "
+                f"Iteration {iteration}: Found a better program on the valset "
                 f"(acceptance {acceptance_score}, raw aggregate {raw_aggregate})."
             )
 
@@ -373,7 +389,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             self.callbacks,
             "on_valset_evaluated",
             ValsetEvaluatedEvent(
-                iteration=state.i + 1,
+                iteration=iteration,
                 candidate_idx=new_program_idx,
                 candidate=new_program,
                 scores_by_val_id=dict(valset_evaluation.scores_by_val_id),
@@ -415,7 +431,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             "is_best",
         ] + [f"text:{name}" for name in component_names]
         row = [
-            state.i + 1,
+            iteration,
             new_program_idx,
             str(parent_program_idx),
             acceptance_score,
@@ -520,6 +536,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
             new_program=cast(dict[str, CandidateT], proposal.candidate),
             state=state,
             parent_program_idx=proposal.parent_program_ids,
+            iteration=iteration,
         )
 
         self._log_proposal_lm_calls(iteration, proposal, candidate_idx=new_idx)
@@ -886,6 +903,7 @@ class GEPAEngine(Generic[DataId, DataInst, Trajectory, RolloutOutput, CandidateT
                                     new_program=cast(dict[str, CandidateT], proposal.candidate),
                                     state=state,
                                     parent_program_idx=proposal.parent_program_ids,
+                                    source="merge",
                                 )
                                 self.merge_proposer.merges_due -= 1
                                 self.merge_proposer.total_merges_tested += 1

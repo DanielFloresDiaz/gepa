@@ -363,6 +363,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
                 parent_ids=[id1, id2],
                 inputs=mini_devset,
                 is_seed_candidate=False,
+                purpose="merge_subsample",
             ),
         )
 
@@ -385,6 +386,7 @@ class MergeProposer(ProposeNewCandidate[DataId]):
                 trajectories=None,
                 objective_scores=[objective_by_id[eid] for eid in subsample_ids] if objective_by_id else None,
                 is_seed_candidate=False,
+                purpose="merge_subsample",
             ),
         )
 

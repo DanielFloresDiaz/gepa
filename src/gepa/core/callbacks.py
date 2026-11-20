@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, NotRequired, Protocol, TypedDict, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, Protocol, TypedDict, runtime_checkable
 
 if TYPE_CHECKING:
     from gepa.core.data_loader import DataLoader
@@ -99,6 +99,14 @@ class MinibatchSampledEvent(TypedDict):
     trainset_size: int
 
 
+EvaluationPurpose = Literal["minibatch", "merge_subsample"]
+"""Why a candidate is evaluated outside the full valset.
+
+* ``minibatch``: the reflective iteration's parent or proposed child on the minibatch.
+* ``merge_subsample``: a merged candidate on the valset subsample its parents share.
+"""
+
+
 class EvaluationStartEvent(TypedDict):
     """Event for on_evaluation_start callback."""
 
@@ -109,6 +117,8 @@ class EvaluationStartEvent(TypedDict):
     parent_ids: Sequence[ProgramIdx]
     inputs: list[Any]
     is_seed_candidate: bool
+    purpose: NotRequired[EvaluationPurpose]
+    """Why the evaluation runs (``minibatch`` when absent)."""
 
 
 class EvaluationEndEvent(TypedDict):
@@ -123,6 +133,8 @@ class EvaluationEndEvent(TypedDict):
     trajectories: list[Any] | None
     objective_scores: list[dict[str, float]] | None
     is_seed_candidate: bool
+    purpose: NotRequired[EvaluationPurpose]
+    """Why the evaluation ran (``minibatch`` when absent)."""
 
 
 class EvaluationSkippedEvent(TypedDict):
@@ -234,6 +246,20 @@ class ParetoFrontUpdatedEvent(TypedDict):
     displaced_candidates: list[int]
 
 
+class FullEvaluationStartEvent(TypedDict):
+    """Event for on_full_evaluation_start callback.
+
+    Fired right before an accepted candidate (a reflective proposal or a merge)
+    is evaluated on the valset, in the thread that runs that evaluation.
+    ``iteration`` is the iteration that produced the candidate, which can be
+    earlier than the current one when proposals run in parallel.
+    """
+
+    iteration: int
+    parent_ids: Sequence[ProgramIdx]
+    source: Literal["reflective", "merge"]
+
+
 class ValsetEvaluatedEvent(TypedDict):
     """Event for on_valset_evaluated callback.
 
@@ -340,6 +366,10 @@ class GEPACallback(Protocol):
 
     def on_evaluation_skipped(self, event: EvaluationSkippedEvent) -> None:
         """Called when an evaluation is skipped or its results are not used."""
+        ...
+
+    def on_full_evaluation_start(self, event: FullEvaluationStartEvent) -> None:
+        """Called before an accepted candidate is evaluated on the validation set."""
         ...
 
     def on_valset_evaluated(self, event: ValsetEvaluatedEvent) -> None:
@@ -512,6 +542,9 @@ class CompositeCallback:
 
     def on_evaluation_skipped(self, event: EvaluationSkippedEvent) -> None:
         self._notify("on_evaluation_skipped", event)
+
+    def on_full_evaluation_start(self, event: FullEvaluationStartEvent) -> None:
+        self._notify("on_full_evaluation_start", event)
 
     def on_valset_evaluated(self, event: ValsetEvaluatedEvent) -> None:
         self._notify("on_valset_evaluated", event)

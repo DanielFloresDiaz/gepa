@@ -56,6 +56,7 @@ API_MAPPING = {
         ("gepa.core.callbacks", "CandidateRejectedEvent", "CandidateRejectedEvent"),
         ("gepa.core.callbacks", "EvaluationStartEvent", "EvaluationStartEvent"),
         ("gepa.core.callbacks", "EvaluationEndEvent", "EvaluationEndEvent"),
+        ("gepa.core.callbacks", "FullEvaluationStartEvent", "FullEvaluationStartEvent"),
         ("gepa.core.callbacks", "ValsetEvaluatedEvent", "ValsetEvaluatedEvent"),
         ("gepa.core.callbacks", "ParetoFrontUpdatedEvent", "ParetoFrontUpdatedEvent"),
         ("gepa.core.callbacks", "MergeAttemptedEvent", "MergeAttemptedEvent"),

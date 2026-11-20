@@ -73,10 +73,11 @@ GEPA fires 21 event types.  Each is a `TypedDict` — access fields with `event[
 
 | Method | When | Key fields |
 |--------|------|-----------|
-| `on_evaluation_start` | Before adapter.evaluate() | `iteration`, `candidate_idx`, `batch_size`, `capture_traces`, `inputs`, `is_seed_candidate` |
-| `on_evaluation_end` | After adapter.evaluate() | `iteration`, `candidate_idx`, `scores`, `outputs`, `trajectories`, `objective_scores`, `is_seed_candidate` |
+| `on_evaluation_start` | Before adapter.evaluate() | `iteration`, `candidate_idx`, `batch_size`, `capture_traces`, `inputs`, `is_seed_candidate`, `purpose` (`minibatch`, or `merge_subsample` for a merged candidate; absent means `minibatch`) |
+| `on_evaluation_end` | After adapter.evaluate() | `iteration`, `candidate_idx`, `scores`, `outputs`, `trajectories`, `objective_scores`, `is_seed_candidate`, `purpose` |
 | `on_evaluation_skipped` | Evaluation skipped (no trajectories / perfect score) | `iteration`, `candidate_idx`, `reason`, `scores` |
-| `on_valset_evaluated` | After a candidate is scored on the full validation set | `iteration`, `candidate_idx`, `candidate`, `scores_by_val_id` (raw per-example metrics), `average_score` (policy valset score; acceptance under the default policy), `acceptance_score`, `raw_aggregate`, `is_best_program`, `outputs_by_val_id` |
+| `on_full_evaluation_start` | Before an accepted candidate (reflective proposal or merge) is scored on the validation set, in the thread that runs it | `iteration` (the iteration that produced the candidate, earlier than the current one with `num_parallel_proposals > 1`), `parent_ids`, `source` (`reflective` or `merge`) |
+| `on_valset_evaluated` | After a candidate is scored on the full validation set | `iteration` (the iteration that produced the candidate), `candidate_idx`, `candidate`, `scores_by_val_id` (raw per-example metrics), `average_score` (policy valset score; acceptance under the default policy), `acceptance_score`, `raw_aggregate`, `is_best_program`, `outputs_by_val_id` |
 
 ### Reflection events
 
