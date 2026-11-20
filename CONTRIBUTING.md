@@ -83,7 +83,7 @@ uv run pyright src/gepa/strategies/
 
 ## Releases
 
-See `.cursor/skills/release/SKILL.md` for the full release workflow. In brief:
+See `.claude/skills/release/SKILL.md` for the full release workflow. In brief:
 
 1. Merge `develop` → `main`
 2. Bump `pyproject.toml` version and write `changelogs/v<version>.md`
